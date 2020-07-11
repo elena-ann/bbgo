@@ -17,8 +17,9 @@ import (
 )
 
 type KLineStrategy struct {
-	Symbol    string          `json:"symbol"`
-	Detectors []KLineDetector `json:"detectors"`
+	Symbol       string          `json:"symbol"`
+	Detectors    []KLineDetector `json:"detectors"`
+	BaseQuantity float64         `json:"baseQuantity"`
 
 	Trader          *bbgo.Trader                 `json:"-"`
 	KLineWindowSize int                          `json:"kLineWindowSize"`
