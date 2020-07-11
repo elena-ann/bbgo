@@ -53,6 +53,7 @@ func (c *VolumeCalculator) minAmount(volume float64, currentPrice float64) float
 
 func (c *VolumeCalculator) Volume(currentPrice float64, change float64, side types.SideType) float64 {
 	volume := c.BaseQuantity * c.VolumeByChange(change)
+
 	if side == types.SideTypeSell {
 		volume *= c.modifySellVolume(currentPrice)
 	} else {

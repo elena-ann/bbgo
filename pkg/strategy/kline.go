@@ -52,7 +52,7 @@ func (s *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, exchange 
 		return fmt.Errorf("market not found %s", s.Symbol)
 	}
 
-	klineWindow := s.KLineWindows["1d"].Take(60)
+	klineWindow := s.KLineWindows["1d"].Tail(60)
 
 	s.VolumeCalculator = &VolumeCalculator{
 		Market:         market,
@@ -60,6 +60,8 @@ func (s *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, exchange 
 		HistoricalHigh: klineWindow.GetHigh(),
 		HistoricalLow:  klineWindow.GetLow(),
 	}
+
+	log.Infof("volume calculator: %+v", s.VolumeCalculator)
 
 	return nil
 }
