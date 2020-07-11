@@ -3,17 +3,18 @@ package strategy
 import (
 	"context"
 	"fmt"
-	"github.com/c9s/bbgo/pkg/slack/slackstyle"
-	log "github.com/sirupsen/logrus"
 	"math"
 	"strconv"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+	"github.com/slack-go/slack"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/pkg/slack/slackstyle"
 	"github.com/c9s/bbgo/pkg/util"
-	"github.com/slack-go/slack"
 )
 
 type KLineStrategy struct {
@@ -26,8 +27,7 @@ type KLineStrategy struct {
 	KLineWindows    map[string]types.KLineWindow `json:"-"`
 	cache           *util.VolatileMemory         `json:"-"`
 
-	price60daysLow  float64
-	price60daysHigh float64
+	VolumeCalculator *VolumeCalculator `json:"-"`
 }
 
 func (s *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, exchange *binance.Exchange) error {
@@ -46,9 +46,21 @@ func (s *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, exchange 
 		s.KLineWindows[interval] = klines
 	}
 
-	kline60days := s.KLineWindows["1d"].Take(60)
-	s.price60daysLow = kline60days.GetLow()
-	s.price60daysHigh = kline60days.GetHigh()
+
+	market, ok := bbgo.FindMarket(s.Symbol)
+	if !ok {
+		return fmt.Errorf("market not found %s", s.Symbol)
+	}
+
+	klineWindow := s.KLineWindows["1d"].Take(60)
+
+	s.VolumeCalculator = &VolumeCalculator{
+		Market:         market,
+		BaseQuantity:   s.BaseQuantity,
+		HistoricalHigh: klineWindow.GetHigh(),
+		HistoricalLow:  klineWindow.GetLow(),
+	}
+
 	return nil
 }
 
@@ -254,7 +266,7 @@ func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.Trading
 		side = types.SideTypeSell
 	}
 
-	var v = VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side)
+	var v = strategy.VolumeCalculator.Volume(kline.GetClose(), kline.GetChange(), side)
 	var volume = tradingCtx.Market.FormatVolume(v)
 	return &types.Order{
 		Symbol:    e.KLine.Symbol,
