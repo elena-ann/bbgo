@@ -2,10 +2,9 @@ package strategy
 
 import (
 	"fmt"
-	binance2 "github.com/adshao/go-binance"
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
-	types2 "github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/slack-go/slack"
 	"math"
@@ -132,8 +131,8 @@ func (d *KLineDetector) String() string {
 	return name
 }
 
-func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext) *types2.Order {
-	var kline types2.KLineOrWindow = e.KLine
+func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext) *types.Order {
+	var kline types.KLineOrWindow = e.KLine
 	if d.EnableLookBack {
 		klineWindow := tradingCtx.KLineWindows[e.KLine.Interval]
 		if len(klineWindow) >= d.LookBackFrames {
@@ -143,23 +142,23 @@ func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.Trading
 
 	var trend = kline.GetTrend()
 
-	var side types2.SideType
+	var side types.SideType
 	if trend < 0 {
-		side = types2.SideTypeBuy
+		side = types.SideTypeBuy
 	} else if trend > 0 {
-		side = types2.SideTypeSell
+		side = types.SideTypeSell
 	}
 
 	var volume = tradingCtx.Market.FormatVolume(bbgo.VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side))
-	return &types2.Order{
+	return &types.Order{
 		Symbol:    e.KLine.Symbol,
-		Type:      binance2.OrderTypeMarket,
+		Type:      types.OrderTypeMarket,
 		Side:      side,
 		VolumeStr: volume,
 	}
 }
 
-func (d *KLineDetector) Detect(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext) (reason string, kline types2.KLineOrWindow, ok bool) {
+func (d *KLineDetector) Detect(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext) (reason string, kline types.KLineOrWindow, ok bool) {
 	kline = e.KLine
 
 	// if the 3m trend is drop, do not buy, let 5m window handle it.
