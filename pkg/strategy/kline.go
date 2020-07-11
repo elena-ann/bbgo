@@ -253,7 +253,8 @@ func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.Trading
 		side = types.SideTypeSell
 	}
 
-	var volume = tradingCtx.Market.FormatVolume(VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side))
+	var v = VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side)
+	var volume = tradingCtx.Market.FormatVolume(v)
 	return &types.Order{
 		Symbol:    e.KLine.Symbol,
 		Type:      types.OrderTypeMarket,

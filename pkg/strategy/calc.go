@@ -6,6 +6,64 @@ import (
 	"math"
 )
 
+// https://www.desmos.com/calculator/wik4ozkwto
+type VolumeCalculator struct {
+	Market bbgo.Market
+
+	BaseQuantity float64
+	HistoricalHigh float64 // 10500.0
+	HistoricalLow  float64 // 7500.0
+}
+
+func (c *VolumeCalculator) modifyBuyVolume(price float64) float64 {
+	maxChange := c.HistoricalHigh - c.HistoricalLow
+	targetPrice := c.HistoricalLow // we will get 1 at price 7500, and more below 7500
+	flatness := maxChange * 0.5    // higher number buys more in the middle section. higher number gets more flat line, reduced to 0 at price 2000 * 10
+	return math.Exp(-(price - targetPrice) / flatness)
+}
+
+func (c *VolumeCalculator) modifySellVolume(price float64) float64 {
+	// \exp\left(\frac{x-10000}{500}\right)
+	maxChange := c.HistoricalHigh - c.HistoricalLow
+	targetPrice := c.HistoricalHigh // target to sell most x1 at 10000.0
+	flatness := maxChange * 0.3     // higher number sells more in the middle section, lower number sells fewer in the middle section.
+	return math.Exp((price - targetPrice) / flatness)
+}
+
+func (c *VolumeCalculator) VolumeByChange(change float64) float64 {
+	maxChange := c.HistoricalHigh - c.HistoricalLow
+	flatness := maxChange * 0.6
+	return math.Exp((math.Abs(change))/flatness)
+}
+
+func (c *VolumeCalculator) minQuantity(volume float64) float64 {
+	return math.Max(c.Market.MinQuantity, volume)
+}
+
+func (c *VolumeCalculator) minAmount(volume float64, currentPrice float64) float64 {
+	// modify volume for the min amount
+	amount := currentPrice * volume
+	if amount < c.Market.MinAmount {
+		ratio := c.Market.MinAmount / amount
+		volume *= ratio
+	}
+
+	return volume
+}
+
+func (c *VolumeCalculator) Volume(currentPrice float64, change float64, side types.SideType) float64 {
+	volume := c.BaseQuantity * c.VolumeByChange(change)
+	if side == types.SideTypeSell {
+		volume *= c.modifySellVolume(currentPrice)
+	} else {
+		volume *= c.modifyBuyVolume(currentPrice)
+	}
+
+	volume = c.minQuantity(volume)
+	volume = c.minAmount(volume, currentPrice)
+	return c.Market.CanonicalizeVolume(volume)
+}
+
 // https://www.desmos.com/calculator/ircjhtccbn
 func BuyVolumeModifier(price float64) float64 {
 	targetPrice := 7500.0 // we will get 1 at price 7500, and more below 7500
@@ -47,4 +105,3 @@ func BaseVolumeByPriceChange(change float64) float64 {
 	return 0.2 * math.Exp((math.Abs(change)-3100.0)/1600.0)
 	// 0.116*math.Exp(math.Abs(change)/2400) - 0.1
 }
-
