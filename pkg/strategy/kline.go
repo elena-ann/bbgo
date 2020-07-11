@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/c9s/bbgo/pkg/slack/slackstyle"
+	log "github.com/sirupsen/logrus"
 	"math"
 	"strconv"
 	"time"
@@ -20,7 +21,7 @@ type KLineStrategy struct {
 	Detectors []KLineDetector `json:"detectors"`
 
 	Trader          *bbgo.Trader                 `json:"-"`
-	KLineWindowSize int                          `json:"-"`
+	KLineWindowSize int                          `json:"kLineWindowSize"`
 	KLineWindows    map[string]types.KLineWindow `json:"-"`
 	cache           *util.VolatileMemory         `json:"-"`
 
@@ -38,6 +39,8 @@ func (s *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, exchange 
 		if err != nil {
 			return err
 		}
+
+		log.Infof("[kline] fetched %s x %d", interval, len(klines))
 
 		s.KLineWindows[interval] = klines
 	}

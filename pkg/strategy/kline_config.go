@@ -2,13 +2,14 @@ package strategy
 
 var DefaultKLineStrategy = KLineStrategy{
 	Symbol: "BTCUSDT",
+	KLineWindowSize: 500,
 	Detectors: []KLineDetector{
 		// extremely short term rules
 
 		// 1m quick drops or raises
 		{
 			Interval:          "1m",
-			MinMaxPriceChange: 62.0,
+			MinMaxPriceChange: 42.0,
 
 			EnableMinThickness: true,
 			MinThickness:       5.5 / 10.0,
