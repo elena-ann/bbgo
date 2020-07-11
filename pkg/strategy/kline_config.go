@@ -24,7 +24,7 @@ var DefaultKLineStrategy = KLineStrategy{
 		// 5m drops or raises
 		{
 			Interval:          "1m",
-			MinMaxPriceChange: 72.0,
+			MinMaxPriceChange: 62.0,
 
 			EnableMinThickness: true,
 			MinThickness:       5.5 / 10.0,
