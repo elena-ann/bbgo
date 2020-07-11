@@ -184,7 +184,7 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 	if util.NotZero(d.MaxMaxPriceChange) {
 		maxPriceChangeRange = fmt.Sprintf("%.2f ~ %.2f", d.MinMaxPriceChange, d.MaxMaxPriceChange)
 	}
-	name += " MaxMaxPriceChange " + maxPriceChangeRange
+	name += " MaxPriceChangeRange " + maxPriceChangeRange
 
 	var fields = []slack.AttachmentField{
 		{
