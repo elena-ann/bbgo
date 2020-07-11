@@ -1,21 +1,27 @@
-package bbgo
+package strategy
 
 import (
 	"fmt"
-	"github.com/adshao/go-binance"
-	"github.com/c9s/bbgo/pkg/bbgo/types"
-	binance2 "github.com/c9s/bbgo/pkg/exchange/binance"
-	types2 "github.com/c9s/bbgo/pkg/types"
+	binance2 "github.com/adshao/go-binance"
+	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
+	types2 "github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/slack-go/slack"
 	"math"
 	"strconv"
 )
 
-const epsilon = 0.0000001
+type KLineStrategy struct {
+	Detectors []KLineDetector `json:"detectors"`
+}
 
-func NotZero(v float64) bool {
-	return math.Abs(v) > epsilon
+func (s *KLineStrategy) Init(stream *binance.PrivateStream) {
+
+}
+
+func (s *KLineStrategy) Handle(event *binance.KLineEvent) {
+
 }
 
 type KLineDetector struct {
@@ -57,7 +63,7 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 	}
 
 	var maxPriceChangeRange = fmt.Sprintf("%.2f ~ NO LIMIT", d.MinMaxPriceChange)
-	if NotZero(d.MaxMaxPriceChange) {
+	if util.NotZero(d.MaxMaxPriceChange) {
 		maxPriceChangeRange = fmt.Sprintf("%.2f ~ %.2f", d.MinMaxPriceChange, d.MaxMaxPriceChange)
 	}
 	name += " MaxMaxPriceChange " + maxPriceChangeRange
@@ -70,7 +76,7 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 		},
 	}
 
-	if d.EnableMinThickness && NotZero(d.MinThickness) {
+	if d.EnableMinThickness && util.NotZero(d.MinThickness) {
 		fields = append(fields, slack.AttachmentField{
 			Title: "MinThickness",
 			Value: util.FormatFloat(d.MinThickness, 4),
@@ -78,7 +84,7 @@ func (d *KLineDetector) SlackAttachment() slack.Attachment {
 		})
 	}
 
-	if d.EnableMaxShadowRatio && NotZero(d.MaxShadowRatio) {
+	if d.EnableMaxShadowRatio && util.NotZero(d.MaxShadowRatio) {
 		fields = append(fields, slack.AttachmentField{
 			Title: "MaxShadowRatio",
 			Value: util.FormatFloat(d.MaxShadowRatio, 4),
@@ -126,8 +132,8 @@ func (d *KLineDetector) String() string {
 	return name
 }
 
-func (d *KLineDetector) NewOrder(e *binance2.KLineEvent, tradingCtx *TradingContext) *types2.Order {
-	var kline types.KLineOrWindow = e.KLine
+func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext) *types2.Order {
+	var kline types2.KLineOrWindow = e.KLine
 	if d.EnableLookBack {
 		klineWindow := tradingCtx.KLineWindows[e.KLine.Interval]
 		if len(klineWindow) >= d.LookBackFrames {
@@ -137,23 +143,23 @@ func (d *KLineDetector) NewOrder(e *binance2.KLineEvent, tradingCtx *TradingCont
 
 	var trend = kline.GetTrend()
 
-	var side binance.SideType
+	var side types2.SideType
 	if trend < 0 {
-		side = binance.SideTypeBuy
+		side = types2.SideTypeBuy
 	} else if trend > 0 {
-		side = binance.SideTypeSell
+		side = types2.SideTypeSell
 	}
 
-	var volume = tradingCtx.Market.FormatVolume(VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side))
+	var volume = tradingCtx.Market.FormatVolume(bbgo.VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side))
 	return &types2.Order{
 		Symbol:    e.KLine.Symbol,
-		Type:      binance.OrderTypeMarket,
+		Type:      binance2.OrderTypeMarket,
 		Side:      side,
 		VolumeStr: volume,
 	}
 }
 
-func (d *KLineDetector) Detect(e *binance2.KLineEvent, tradingCtx *TradingContext) (reason string, kline types.KLineOrWindow, ok bool) {
+func (d *KLineDetector) Detect(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext) (reason string, kline types2.KLineOrWindow, ok bool) {
 	kline = e.KLine
 
 	// if the 3m trend is drop, do not buy, let 5m window handle it.
@@ -177,7 +183,7 @@ func (d *KLineDetector) Detect(e *binance2.KLineEvent, tradingCtx *TradingContex
 		return "", kline, false
 	}
 
-	if NotZero(d.MaxMaxPriceChange) && maxChange > d.MaxMaxPriceChange {
+	if util.NotZero(d.MaxMaxPriceChange) && maxChange > d.MaxMaxPriceChange {
 		return fmt.Sprintf("exceeded max price change %.4f > %.4f", maxChange, d.MaxMaxPriceChange), kline, false
 	}
 
@@ -210,16 +216,16 @@ func (d *KLineDetector) Detect(e *binance2.KLineEvent, tradingCtx *TradingContex
 
 	}
 
-	if NotZero(d.MinProfitPriceTick) {
+	if util.NotZero(d.MinProfitPriceTick) {
 
 		// do not buy too early if it's greater than the average bid price + min profit tick
 		if trend < 0 && kline.GetClose() > (tradingCtx.AverageBidPrice-d.MinProfitPriceTick) {
-			return fmt.Sprintf("price %f is greater than the average price + min profit tick %f", kline.GetClose(), tradingCtx.AverageBidPrice - d.MinProfitPriceTick), kline, false
+			return fmt.Sprintf("price %f is greater than the average price + min profit tick %f", kline.GetClose(), tradingCtx.AverageBidPrice-d.MinProfitPriceTick), kline, false
 		}
 
 		// do not sell too early if it's less than the average bid price + min profit tick
 		if trend > 0 && kline.GetClose() < (tradingCtx.AverageBidPrice+d.MinProfitPriceTick) {
-			return fmt.Sprintf("price %f is less than the average price + min profit tick %f", kline.GetClose(), tradingCtx.AverageBidPrice + d.MinProfitPriceTick), kline, false
+			return fmt.Sprintf("price %f is less than the average price + min profit tick %f", kline.GetClose(), tradingCtx.AverageBidPrice+d.MinProfitPriceTick), kline, false
 		}
 
 	}
