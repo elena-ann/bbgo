@@ -2,25 +2,61 @@ package strategy
 
 import (
 	"fmt"
+	"context"
+	"math"
+	"strconv"
+
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"github.com/c9s/bbgo/pkg/util"
 	"github.com/slack-go/slack"
-	"math"
-	"strconv"
 )
 
 type KLineStrategy struct {
-	Detectors []KLineDetector `json:"detectors"`
+	Symbol          string `json:"symbol"`
+	KLineWindowSize int
+	KLineWindows    map[string]types.KLineWindow
+	Detectors       []KLineDetector `json:"detectors"`
 }
 
-func (s *KLineStrategy) Init(stream *binance.PrivateStream) {
+func (s *KLineStrategy) Init(ctx context.Context, exchange *binance.Exchange) error {
+	for _, interval := range []string{"1m", "5m", "1h", "1d"} {
+		klines, err := exchange.QueryKLines(ctx, s.Symbol, interval, s.KLineWindowSize)
+		if err != nil {
+			return err
+		}
 
+		s.KLineWindows[interval] = klines
+	}
+
+	return nil
 }
 
-func (s *KLineStrategy) Handle(event *binance.KLineEvent) {
 
+
+
+// Subscribe defines what to subscribe for the strategy
+func (s *KLineStrategy) OnConnect(stream *binance.PrivateStream) {
+	stream.Subscribe("kline", s.Symbol, binance.SubscribeOptions{Interval: "1m"})
+	stream.Subscribe("kline", s.Symbol, binance.SubscribeOptions{Interval: "5m"})
+	stream.Subscribe("kline", s.Symbol, binance.SubscribeOptions{Interval: "1h"})
+	stream.Subscribe("kline", s.Symbol, binance.SubscribeOptions{Interval: "1d"})
+}
+
+func (s *KLineStrategy) OnKLineClosedEvent(e *binance.KLineEvent) {
+	s.AddKLine(*e.KLine)
+}
+
+func (s *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
+	var klineWindow = s.KLineWindows[kline.Interval]
+	klineWindow.Add(kline)
+
+	if s.KLineWindowSize > 0 {
+		klineWindow.Truncate(s.KLineWindowSize)
+	}
+
+	return klineWindow
 }
 
 type KLineDetector struct {
@@ -149,7 +185,7 @@ func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.Trading
 		side = types.SideTypeSell
 	}
 
-	var volume = tradingCtx.Market.FormatVolume(bbgo.VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side))
+	var volume = tradingCtx.Market.FormatVolume(VolumeByPriceChange(tradingCtx.Market, kline.GetClose(), kline.GetChange(), side))
 	return &types.Order{
 		Symbol:    e.KLine.Symbol,
 		Type:      types.OrderTypeMarket,

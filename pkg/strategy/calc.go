@@ -1,12 +1,10 @@
-package bbgo
+package strategy
 
 import (
-	types2 "github.com/c9s/bbgo/pkg/bbgo/types"
+	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"math"
 )
-
-// this is for BTC
-const MinQuantity = 0.00000100
 
 // https://www.desmos.com/calculator/ircjhtccbn
 func BuyVolumeModifier(price float64) float64 {
@@ -22,10 +20,10 @@ func SellVolumeModifier(price float64) float64 {
 	return math.Min(2, math.Exp((price-targetPrice)/flatness))
 }
 
-func VolumeByPriceChange(market Market, currentPrice float64, change float64, side types2.SideType) float64 {
+func VolumeByPriceChange(market bbgo.Market, currentPrice float64, change float64, side types.SideType) float64 {
 	volume := BaseVolumeByPriceChange(change)
 
-	if side == types2.SideTypeSell {
+	if side == types.SideTypeSell {
 		volume *= SellVolumeModifier(currentPrice)
 	} else {
 		volume *= BuyVolumeModifier(currentPrice)
@@ -41,7 +39,7 @@ func VolumeByPriceChange(market Market, currentPrice float64, change float64, si
 		volume *= ratio
 	}
 
-	volume = math.Trunc(volume * math.Pow10(market.VolumePrecision)) / math.Pow10(market.VolumePrecision)
+	volume = math.Trunc(volume*math.Pow10(market.VolumePrecision)) / math.Pow10(market.VolumePrecision)
 	return volume
 }
 

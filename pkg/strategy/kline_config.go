@@ -1,6 +1,7 @@
 package strategy
 
 var DefaultKLineStrategy = KLineStrategy{
+	Symbol: "BTCUSDT",
 	Detectors: []KLineDetector{
 		// extremely short term rules
 
@@ -78,4 +79,3 @@ var DefaultKLineStrategy = KLineStrategy{
 		},
 	},
 }
-
