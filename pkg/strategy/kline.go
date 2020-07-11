@@ -1,10 +1,12 @@
 package strategy
 
 import (
-	"fmt"
 	"context"
+	"fmt"
+	"github.com/c9s/bbgo/pkg/slack/slackstyle"
 	"math"
 	"strconv"
+	"time"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/bbgo/exchange/binance"
@@ -14,13 +16,20 @@ import (
 )
 
 type KLineStrategy struct {
-	Symbol          string `json:"symbol"`
-	KLineWindowSize int
-	KLineWindows    map[string]types.KLineWindow
-	Detectors       []KLineDetector `json:"detectors"`
+	Symbol    string          `json:"symbol"`
+	Detectors []KLineDetector `json:"detectors"`
+
+	Trader          *bbgo.Trader                 `json:"-"`
+	KLineWindowSize int                          `json:"-"`
+	KLineWindows    map[string]types.KLineWindow `json:"-"`
+	cache           *util.VolatileMemory         `json:"-"`
 }
 
-func (s *KLineStrategy) Init(ctx context.Context, exchange *binance.Exchange) error {
+func (s *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, exchange *binance.Exchange) error {
+	s.Trader = trader
+	s.cache = util.NewDetectorCache()
+	s.KLineWindows = map[string]types.KLineWindow{}
+
 	for _, interval := range []string{"1m", "5m", "1h", "1d"} {
 		klines, err := exchange.QueryKLines(ctx, s.Symbol, interval, s.KLineWindowSize)
 		if err != nil {
@@ -33,9 +42,6 @@ func (s *KLineStrategy) Init(ctx context.Context, exchange *binance.Exchange) er
 	return nil
 }
 
-
-
-
 // Subscribe defines what to subscribe for the strategy
 func (s *KLineStrategy) OnConnect(stream *binance.PrivateStream) {
 	stream.Subscribe("kline", s.Symbol, binance.SubscribeOptions{Interval: "1m"})
@@ -46,6 +52,59 @@ func (s *KLineStrategy) OnConnect(stream *binance.PrivateStream) {
 
 func (s *KLineStrategy) OnKLineClosedEvent(e *binance.KLineEvent) {
 	s.AddKLine(*e.KLine)
+
+	trend := e.KLine.GetTrend()
+
+	// price is not changed, do not act
+	if trend == 0 {
+		return
+	}
+
+	var trendIcon = slackstyle.TrendIcon(trend)
+	var trader = s.Trader
+	var ctx = context.Background()
+
+	for _, detector := range s.Detectors {
+		if detector.Interval != e.KLine.Interval {
+			continue
+		}
+
+		reason, kline, ok := detector.Detect(e, trader.Context, s)
+		if !ok {
+
+			if len(reason) > 0 &&
+				(s.cache.IsTextFresh(reason, 30*time.Minute) &&
+					s.cache.IsObjectFresh(&detector, 10*time.Minute)) {
+				trader.Infof(trendIcon+" *SKIP* reason: %s", reason, detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
+			}
+
+		} else {
+			if len(reason) > 0 {
+				trader.Infof(trendIcon+" *TRIGGERED* reason: %s", reason, detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
+			} else {
+				trader.Infof(trendIcon+" *TRIGGERED* ", detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
+			}
+
+			var order = detector.NewOrder(e, trader.Context, s)
+
+			if order != nil {
+				var delay = time.Duration(detector.DelayMilliseconds) * time.Millisecond
+
+				// add a delay
+				if delay > 0 {
+					time.AfterFunc(delay, func() {
+						trader.SubmitOrder(ctx, order)
+					})
+				} else {
+					trader.SubmitOrder(ctx, order)
+				}
+			}
+
+			if detector.Stop {
+				return
+			}
+		}
+	}
 }
 
 func (s *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
@@ -167,10 +226,10 @@ func (d *KLineDetector) String() string {
 	return name
 }
 
-func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext) *types.Order {
+func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext, strategy *KLineStrategy) *types.Order {
 	var kline types.KLineOrWindow = e.KLine
 	if d.EnableLookBack {
-		klineWindow := tradingCtx.KLineWindows[e.KLine.Interval]
+		klineWindow := strategy.KLineWindows[e.KLine.Interval]
 		if len(klineWindow) >= d.LookBackFrames {
 			kline = klineWindow.Tail(d.LookBackFrames)
 		}
@@ -194,12 +253,12 @@ func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.Trading
 	}
 }
 
-func (d *KLineDetector) Detect(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext) (reason string, kline types.KLineOrWindow, ok bool) {
+func (d *KLineDetector) Detect(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext, strategy *KLineStrategy) (reason string, kline types.KLineOrWindow, ok bool) {
 	kline = e.KLine
 
 	// if the 3m trend is drop, do not buy, let 5m window handle it.
 	if d.EnableLookBack {
-		klineWindow := tradingCtx.KLineWindows[e.KLine.Interval]
+		klineWindow := strategy.KLineWindows[e.KLine.Interval]
 		if len(klineWindow) >= d.LookBackFrames {
 			kline = klineWindow.Tail(d.LookBackFrames)
 		}
