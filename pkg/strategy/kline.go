@@ -23,6 +23,9 @@ type KLineStrategy struct {
 	KLineWindowSize int                          `json:"-"`
 	KLineWindows    map[string]types.KLineWindow `json:"-"`
 	cache           *util.VolatileMemory         `json:"-"`
+
+	price60daysLow  float64
+	price60daysHigh float64
 }
 
 func (s *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, exchange *binance.Exchange) error {
@@ -39,6 +42,9 @@ func (s *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, exchange 
 		s.KLineWindows[interval] = klines
 	}
 
+	kline60days := s.KLineWindows["1d"].Take(60)
+	s.price60daysLow = kline60days.GetLow()
+	s.price60daysHigh = kline60days.GetHigh()
 	return nil
 }
 
