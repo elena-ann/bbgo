@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 
 	"github.com/c9s/bbgo/pkg/bbgo"
@@ -35,10 +34,10 @@ type KLineStrategy struct {
 	volumeCalculator *VolumeCalculator            `json:"-"`
 }
 
-func (strategy *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, klineSource KLineService) error {
+func (strategy *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, klineWindows map[string]types.KLineWindow) error {
 	strategy.trader = trader
 	strategy.cache = util.NewDetectorCache()
-	strategy.klineWindows = map[string]types.KLineWindow{}
+	strategy.klineWindows = klineWindows
 
 	market, ok := bbgo.FindMarket(strategy.Symbol)
 	if !ok {
@@ -47,18 +46,7 @@ func (strategy *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, kl
 
 	strategy.market = market
 
-	for _, interval := range []string{"1m", "5m", "1h", "1d"} {
-		klines, err := klineSource.QueryKLines(ctx, strategy.Symbol, interval, strategy.KLineWindowSize)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("[kline] fetched %s x %d", interval, len(klines))
-
-		strategy.klineWindows[interval] = klines
-	}
-
-	klineWindow := strategy.klineWindows["1d"].Tail(60)
+	klineWindow := klineWindows["1d"].Tail(60)
 
 	strategy.volumeCalculator = &VolumeCalculator{
 		Market:         market,
