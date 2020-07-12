@@ -2,13 +2,13 @@ package strategy
 
 import (
 	"github.com/adshao/go-binance"
-	"github.com/c9s/bbgo/pkg/bbgo"
+	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"testing"
 )
 
 func TestVolumeByPriceChange(t *testing.T) {
 	type args struct {
-		market       bbgo.Market
+		market       types.Market
 		currentPrice float64
 		change       float64
 		side         binance.SideType
@@ -21,7 +21,7 @@ func TestVolumeByPriceChange(t *testing.T) {
 		{
 			name: "buy-change-50-at-9400",
 			args: args{
-				market:       bbgo.MarketBTCUSDT,
+				market:       types.MarketBTCUSDT,
 				currentPrice: 9400,
 				change:       50,
 				side:         binance.SideTypeBuy,
@@ -31,7 +31,7 @@ func TestVolumeByPriceChange(t *testing.T) {
 		{
 			name: "buy-change-100-at-9200",
 			args: args{
-				market:       bbgo.MarketBTCUSDT,
+				market:       types.MarketBTCUSDT,
 				currentPrice: 9200,
 				change:       100,
 				side:         binance.SideTypeBuy,
@@ -41,7 +41,7 @@ func TestVolumeByPriceChange(t *testing.T) {
 		{
 			name: "sell-change-100-at-9500",
 			args: args{
-				market:       bbgo.MarketBTCUSDT,
+				market:       types.MarketBTCUSDT,
 				currentPrice: 9500,
 				change:       100,
 				side:         binance.SideTypeSell,
@@ -51,7 +51,7 @@ func TestVolumeByPriceChange(t *testing.T) {
 		{
 			name: "sell-change-200-at-9600",
 			args: args{
-				market:       bbgo.MarketBTCUSDT,
+				market:       types.MarketBTCUSDT,
 				currentPrice: 9500,
 				change:       200,
 				side:         binance.SideTypeSell,
@@ -61,7 +61,7 @@ func TestVolumeByPriceChange(t *testing.T) {
 		{
 			name: "sell-change-500-at-9600",
 			args: args{
-				market:       bbgo.MarketBTCUSDT,
+				market:       types.MarketBTCUSDT,
 				currentPrice: 9600,
 				change:       500,
 				side:         binance.SideTypeSell,

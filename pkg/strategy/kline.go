@@ -29,7 +29,7 @@ type KLineStrategy struct {
 
 	// runtime variables
 	trader           *bbgo.Trader                 `json:"-"`
-	market           bbgo.Market                  `json:"-"`
+	market           types.Market                 `json:"-"`
 	klineWindows     map[string]types.KLineWindow `json:"-"`
 	cache            *util.VolatileMemory         `json:"-"`
 	volumeCalculator *VolumeCalculator            `json:"-"`
@@ -42,7 +42,7 @@ func (strategy *KLineStrategy) Init(trader *bbgo.Trader, klineWindows map[string
 	strategy.cache = util.NewDetectorCache()
 	strategy.klineWindows = klineWindows
 
-	market, ok := bbgo.FindMarket(strategy.Symbol)
+	market, ok := types.FindMarket(strategy.Symbol)
 	if !ok {
 		return fmt.Errorf("market not found %s", strategy.Symbol)
 	}

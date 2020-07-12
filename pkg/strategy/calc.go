@@ -1,14 +1,13 @@
 package strategy
 
 import (
-	"github.com/c9s/bbgo/pkg/bbgo"
 	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"math"
 )
 
 // https://www.desmos.com/calculator/wik4ozkwto
 type VolumeCalculator struct {
-	Market bbgo.Market
+	Market types.Market
 
 	BaseQuantity float64
 	HistoricalHigh float64 // 10500.0
@@ -79,7 +78,7 @@ func SellVolumeModifier(price float64) float64 {
 	return math.Min(2, math.Exp((price-targetPrice)/flatness))
 }
 
-func VolumeByPriceChange(market bbgo.Market, currentPrice float64, change float64, side types.SideType) float64 {
+func VolumeByPriceChange(market types.Market, currentPrice float64, change float64, side types.SideType) float64 {
 	volume := BaseVolumeByPriceChange(change)
 
 	if side == types.SideTypeSell {
