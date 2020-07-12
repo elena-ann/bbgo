@@ -20,6 +20,7 @@ type KLineService interface {
 	QueryKLines(ctx context.Context, symbol string, interval string, limit int) ([]types.KLine, error)
 }
 
+//go:generate callbackgen -type KLineStrategy
 type KLineStrategy struct {
 	Symbol          string          `json:"symbol"`
 	Detectors       []KLineDetector `json:"detectors"`
@@ -32,9 +33,11 @@ type KLineStrategy struct {
 	klineWindows     map[string]types.KLineWindow `json:"-"`
 	cache            *util.VolatileMemory         `json:"-"`
 	volumeCalculator *VolumeCalculator            `json:"-"`
+
+	detectCallbacks []func(ok bool, reason string, detector *KLineDetector, kline types.KLineOrWindow)
 }
 
-func (strategy *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, klineWindows map[string]types.KLineWindow) error {
+func (strategy *KLineStrategy) Init(trader *bbgo.Trader, klineWindows map[string]types.KLineWindow) error {
 	strategy.trader = trader
 	strategy.cache = util.NewDetectorCache()
 	strategy.klineWindows = klineWindows
@@ -94,11 +97,15 @@ func (strategy *KLineStrategy) OnKLineClosedEvent(e *binance.KLineEvent) {
 		}
 
 		reason, ok := detector.Detect(kline, trader.Context)
+
+		strategy.EmitDetect(ok, reason, &detector, kline)
+
 		if !ok {
 
 			if len(reason) > 0 &&
 				(strategy.cache.IsTextFresh(reason, 30*time.Minute) &&
 					strategy.cache.IsObjectFresh(&detector, 10*time.Minute)) {
+
 				trader.Infof(trendIcon+" *SKIP* reason: %s", reason, detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
 			}
 
