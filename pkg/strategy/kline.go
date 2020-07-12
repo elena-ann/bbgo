@@ -279,34 +279,6 @@ func (d *KLineDetector) String() string {
 	return name
 }
 
-func (d *KLineDetector) NewOrder(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext, strategy *KLineStrategy) *types.Order {
-	var kline types.KLineOrWindow = e.KLine
-	if d.EnableLookBack {
-		klineWindow := strategy.KLineWindows[e.KLine.Interval]
-		if len(klineWindow) >= d.LookBackFrames {
-			kline = klineWindow.Tail(d.LookBackFrames)
-		}
-	}
-
-	var trend = kline.GetTrend()
-
-	var side types.SideType
-	if trend < 0 {
-		side = types.SideTypeBuy
-	} else if trend > 0 {
-		side = types.SideTypeSell
-	}
-
-	var v = strategy.VolumeCalculator.Volume(kline.GetClose(), kline.GetChange(), side)
-	var volume = tradingCtx.Market.FormatVolume(v)
-	return &types.Order{
-		Symbol:    e.KLine.Symbol,
-		Type:      types.OrderTypeMarket,
-		Side:      side,
-		VolumeStr: volume,
-	}
-}
-
 func (d *KLineDetector) Detect(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext, strategy *KLineStrategy) (reason string, kline types.KLineOrWindow, ok bool) {
 	kline = e.KLine
 
