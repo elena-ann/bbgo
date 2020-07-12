@@ -17,51 +17,55 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-type KLineStrategy struct {
-	Symbol       string          `json:"symbol"`
-	Detectors    []KLineDetector `json:"detectors"`
-	BaseQuantity float64         `json:"baseQuantity"`
-
-	Trader          *bbgo.Trader                 `json:"-"`
-	KLineWindowSize int                          `json:"kLineWindowSize"`
-	KLineWindows    map[string]types.KLineWindow `json:"-"`
-	cache           *util.VolatileMemory         `json:"-"`
-
-	VolumeCalculator *VolumeCalculator `json:"-"`
+type KLineService interface {
+	QueryKLines(ctx context.Context, symbol string, interval string, limit int) ([]types.KLine, error)
 }
 
-func (strategy *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, exchange *binance.Exchange) error {
-	strategy.Trader = trader
+type KLineStrategy struct {
+	Symbol          string          `json:"symbol"`
+	Detectors       []KLineDetector `json:"detectors"`
+	BaseQuantity    float64         `json:"baseQuantity"`
+	KLineWindowSize int             `json:"kLineWindowSize"`
+
+	// runtime variables
+	trader           *bbgo.Trader                 `json:"-"`
+	market           bbgo.Market                  `json:"-"`
+	klineWindows     map[string]types.KLineWindow `json:"-"`
+	cache            *util.VolatileMemory         `json:"-"`
+	volumeCalculator *VolumeCalculator            `json:"-"`
+}
+
+func (strategy *KLineStrategy) Init(ctx context.Context, trader *bbgo.Trader, klineSource KLineService) error {
+	strategy.trader = trader
 	strategy.cache = util.NewDetectorCache()
-	strategy.KLineWindows = map[string]types.KLineWindow{}
-
-	for _, interval := range []string{"1m", "5m", "1h", "1d"} {
-		klines, err := exchange.QueryKLines(ctx, strategy.Symbol, interval, strategy.KLineWindowSize)
-		if err != nil {
-			return err
-		}
-
-		log.Infof("[kline] fetched %s x %d", interval, len(klines))
-
-		strategy.KLineWindows[interval] = klines
-	}
-
+	strategy.klineWindows = map[string]types.KLineWindow{}
 
 	market, ok := bbgo.FindMarket(strategy.Symbol)
 	if !ok {
 		return fmt.Errorf("market not found %s", strategy.Symbol)
 	}
 
-	klineWindow := strategy.KLineWindows["1d"].Tail(60)
+	strategy.market = market
 
-	strategy.VolumeCalculator = &VolumeCalculator{
+	for _, interval := range []string{"1m", "5m", "1h", "1d"} {
+		klines, err := klineSource.QueryKLines(ctx, strategy.Symbol, interval, strategy.KLineWindowSize)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("[kline] fetched %s x %d", interval, len(klines))
+
+		strategy.klineWindows[interval] = klines
+	}
+
+	klineWindow := strategy.klineWindows["1d"].Tail(60)
+
+	strategy.volumeCalculator = &VolumeCalculator{
 		Market:         market,
 		BaseQuantity:   strategy.BaseQuantity,
 		HistoricalHigh: klineWindow.GetHigh(),
 		HistoricalLow:  klineWindow.GetLow(),
 	}
-
-	log.Infof("volume calculator: %+v", strategy.VolumeCalculator)
 
 	return nil
 }
@@ -85,7 +89,7 @@ func (strategy *KLineStrategy) OnKLineClosedEvent(e *binance.KLineEvent) {
 	}
 
 	var trendIcon = slackstyle.TrendIcon(trend)
-	var trader = strategy.Trader
+	var trader = strategy.trader
 	var ctx = context.Background()
 
 	for _, detector := range strategy.Detectors {
@@ -93,7 +97,15 @@ func (strategy *KLineStrategy) OnKLineClosedEvent(e *binance.KLineEvent) {
 			continue
 		}
 
-		reason, kline, ok := detector.Detect(e, trader.Context, strategy)
+		var kline types.KLineOrWindow = e.KLine
+		if detector.EnableLookBack {
+			klineWindow := strategy.klineWindows[e.KLine.Interval]
+			if len(klineWindow) >= detector.LookBackFrames {
+				kline = klineWindow.Tail(detector.LookBackFrames)
+			}
+		}
+
+		reason, ok := detector.Detect(kline, trader.Context)
 		if !ok {
 
 			if len(reason) > 0 &&
@@ -107,15 +119,6 @@ func (strategy *KLineStrategy) OnKLineClosedEvent(e *binance.KLineEvent) {
 				trader.Infof(trendIcon+" *TRIGGERED* reason: %s", reason, detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
 			} else {
 				trader.Infof(trendIcon+" *TRIGGERED* ", detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
-			}
-
-
-			var kline types.KLineOrWindow = e.KLine
-			if detector.EnableLookBack {
-				klineWindow := strategy.KLineWindows[e.KLine.Interval]
-				if len(klineWindow) >= detector.LookBackFrames {
-					kline = klineWindow.Tail(detector.LookBackFrames)
-				}
 			}
 
 			var order = strategy.NewOrder(kline, trader.Context)
@@ -149,7 +152,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 		side = types.SideTypeSell
 	}
 
-	var v = strategy.VolumeCalculator.Volume(kline.GetClose(), kline.GetChange(), side)
+	var v = strategy.volumeCalculator.Volume(kline.GetClose(), kline.GetChange(), side)
 	var volume = tradingCtx.Market.FormatVolume(v)
 	return &types.Order{
 		Symbol:    strategy.Symbol,
@@ -159,9 +162,8 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	}
 }
 
-
 func (strategy *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
-	var klineWindow = strategy.KLineWindows[kline.Interval]
+	var klineWindow = strategy.klineWindows[kline.Interval]
 	klineWindow.Add(kline)
 
 	if strategy.KLineWindowSize > 0 {
@@ -279,37 +281,28 @@ func (d *KLineDetector) String() string {
 	return name
 }
 
-func (d *KLineDetector) Detect(e *binance.KLineEvent, tradingCtx *bbgo.TradingContext, strategy *KLineStrategy) (reason string, kline types.KLineOrWindow, ok bool) {
-	kline = e.KLine
-
-	// if the 3m trend is drop, do not buy, let 5m window handle it.
-	if d.EnableLookBack {
-		klineWindow := strategy.KLineWindows[e.KLine.Interval]
-		if len(klineWindow) >= d.LookBackFrames {
-			kline = klineWindow.Tail(d.LookBackFrames)
+func (d *KLineDetector) Detect(kline types.KLineOrWindow, tradingCtx *bbgo.TradingContext) (reason string, ok bool) {
+	/*
+		if lookbackKline.AllDrop() {
+			trader.Infof("1m window all drop down (%d frames), do not buy: %+v", d.LookBackFrames, klineWindow)
+		} else if lookbackKline.AllRise() {
+			trader.Infof("1m window all rise up (%d frames), do not sell: %+v", d.LookBackFrames, klineWindow)
 		}
-		/*
-			if lookbackKline.AllDrop() {
-				trader.Infof("1m window all drop down (%d frames), do not buy: %+v", d.LookBackFrames, klineWindow)
-			} else if lookbackKline.AllRise() {
-				trader.Infof("1m window all rise up (%d frames), do not sell: %+v", d.LookBackFrames, klineWindow)
-			}
-		*/
-	}
+	*/
 
 	var maxChange = math.Abs(kline.GetMaxChange())
 
 	if maxChange < d.MinMaxPriceChange {
-		return "", kline, false
+		return "", false
 	}
 
 	if util.NotZero(d.MaxMaxPriceChange) && maxChange > d.MaxMaxPriceChange {
-		return fmt.Sprintf("exceeded max price change %.4f > %.4f", maxChange, d.MaxMaxPriceChange), kline, false
+		return fmt.Sprintf("exceeded max price change %.4f > %.4f", maxChange, d.MaxMaxPriceChange), false
 	}
 
 	if d.EnableMinThickness {
 		if kline.GetThickness() < d.MinThickness {
-			return fmt.Sprintf("kline too thin. %.4f < min kline thickness %.4f", kline.GetThickness(), d.MinThickness), kline, false
+			return fmt.Sprintf("kline too thin. %.4f < min kline thickness %.4f", kline.GetThickness(), d.MinThickness), false
 		}
 	}
 
@@ -317,22 +310,22 @@ func (d *KLineDetector) Detect(e *binance.KLineEvent, tradingCtx *bbgo.TradingCo
 	if d.EnableMaxShadowRatio {
 		if trend > 0 {
 			if kline.GetUpperShadowRatio() > d.MaxShadowRatio {
-				return fmt.Sprintf("kline upper shadow ratio too high. %.4f > %.4f (MaxShadowRatio)", kline.GetUpperShadowRatio(), d.MaxShadowRatio), kline, false
+				return fmt.Sprintf("kline upper shadow ratio too high. %.4f > %.4f (MaxShadowRatio)", kline.GetUpperShadowRatio(), d.MaxShadowRatio), false
 			}
 		} else if trend < 0 {
 			if kline.GetLowerShadowRatio() > d.MaxShadowRatio {
-				return fmt.Sprintf("kline lower shadow ratio too high. %.4f > %.4f (MaxShadowRatio)", kline.GetLowerShadowRatio(), d.MaxShadowRatio), kline, false
+				return fmt.Sprintf("kline lower shadow ratio too high. %.4f > %.4f (MaxShadowRatio)", kline.GetLowerShadowRatio(), d.MaxShadowRatio), false
 			}
 		}
 	}
 
 	if trend > 0 && kline.BounceUp() { // trend up, ignore bounce up
 
-		return fmt.Sprintf("bounce up, do not sell, kline mid: %.4f", kline.Mid()), kline, false
+		return fmt.Sprintf("bounce up, do not sell, kline mid: %.4f", kline.Mid()), false
 
 	} else if trend < 0 && kline.BounceDown() { // trend down, ignore bounce down
 
-		return fmt.Sprintf("bounce down, do not buy, kline mid: %.4f", kline.Mid()), kline, false
+		return fmt.Sprintf("bounce down, do not buy, kline mid: %.4f", kline.Mid()), false
 
 	}
 
@@ -340,12 +333,12 @@ func (d *KLineDetector) Detect(e *binance.KLineEvent, tradingCtx *bbgo.TradingCo
 
 		// do not buy too early if it's greater than the average bid price + min profit tick
 		if trend < 0 && kline.GetClose() > (tradingCtx.AverageBidPrice-d.MinProfitPriceTick) {
-			return fmt.Sprintf("price %f is greater than the average price + min profit tick %f", kline.GetClose(), tradingCtx.AverageBidPrice-d.MinProfitPriceTick), kline, false
+			return fmt.Sprintf("price %f is greater than the average price + min profit tick %f", kline.GetClose(), tradingCtx.AverageBidPrice-d.MinProfitPriceTick), false
 		}
 
 		// do not sell too early if it's less than the average bid price + min profit tick
 		if trend > 0 && kline.GetClose() < (tradingCtx.AverageBidPrice+d.MinProfitPriceTick) {
-			return fmt.Sprintf("price %f is less than the average price + min profit tick %f", kline.GetClose(), tradingCtx.AverageBidPrice+d.MinProfitPriceTick), kline, false
+			return fmt.Sprintf("price %f is less than the average price + min profit tick %f", kline.GetClose(), tradingCtx.AverageBidPrice+d.MinProfitPriceTick), false
 		}
 
 	}
@@ -357,5 +350,5 @@ func (d *KLineDetector) Detect(e *binance.KLineEvent, tradingCtx *bbgo.TradingCo
 
 	*/
 
-	return "", kline, true
+	return "", true
 }
