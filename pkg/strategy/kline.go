@@ -155,13 +155,33 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 		side = types.SideTypeSell
 	}
 
-	var v = strategy.volumeCalculator.Volume(kline.GetClose(), kline.GetChange(), side)
-	var volume = tradingCtx.Market.FormatVolume(v)
+	var currentPrice = kline.GetClose()
+	var volume = strategy.volumeCalculator.Volume(currentPrice, kline.GetChange(), side)
+
+	tradingCtx.Lock()
+	defer tradingCtx.Unlock()
+
+	switch side {
+	case types.SideTypeBuy:
+
+		if balance, ok := tradingCtx.Balances[strategy.market.QuoteCurrency] ; ok {
+			available := balance.Available
+			volume = mostMaxAmount(volume, currentPrice, available * 0.9)
+		}
+
+	case types.SideTypeSell:
+
+		if balance, ok := tradingCtx.Balances[strategy.market.BaseCurrency] ; ok {
+			available := balance.Available
+			volume = math.Min(volume, available * 0.9)
+		}
+	}
+
 	return &types.Order{
 		Symbol:    strategy.Symbol,
 		Type:      types.OrderTypeMarket,
 		Side:      side,
-		VolumeStr: volume,
+		VolumeStr: tradingCtx.Market.FormatVolume(volume),
 	}
 }
 
