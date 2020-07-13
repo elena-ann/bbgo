@@ -29,6 +29,7 @@ type KLineStrategy struct {
 
 	// runtime variables
 	trader           *bbgo.Trader                 `json:"-"`
+
 	market           types.Market                 `json:"-"`
 	KLineWindows     map[string]types.KLineWindow `json:"-"`
 	cache            *util.VolatileMemory         `json:"-"`
