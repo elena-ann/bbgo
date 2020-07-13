@@ -28,7 +28,8 @@ type KLineStrategy struct {
 	KLineWindowSize int             `json:"kLineWindowSize"`
 
 	// runtime variables
-	trader           *bbgo.Trader                 `json:"-"`
+	Trader   *bbgo.Trader `json:"-"`
+	Notifier *bbgo.SlackNotifier `json:"-"`
 
 	market           types.Market                 `json:"-"`
 	KLineWindows     map[string]types.KLineWindow `json:"-"`
@@ -39,7 +40,7 @@ type KLineStrategy struct {
 }
 
 func (strategy *KLineStrategy) Init(trader *bbgo.Trader, stream *binance.PrivateStream) error {
-	strategy.trader = trader
+	strategy.Trader = trader
 	strategy.cache = util.NewDetectorCache()
 
 	// configure stream handlers
@@ -49,7 +50,6 @@ func (strategy *KLineStrategy) Init(trader *bbgo.Trader, stream *binance.Private
 	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "5m"})
 	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1h"})
 	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1d"})
-
 
 	market, ok := types.FindMarket(strategy.Symbol)
 	if !ok {
@@ -84,7 +84,7 @@ func (strategy *KLineStrategy) OnKLineClosedEvent(e *binance.KLineEvent) {
 	}
 
 	var trendIcon = slackstyle.TrendIcon(trend)
-	var trader = strategy.trader
+	var trader = strategy.Trader
 	var ctx = context.Background()
 
 	for _, detector := range strategy.Detectors {
@@ -283,9 +283,9 @@ func (d *KLineDetector) String() string {
 func (d *KLineDetector) Detect(kline types.KLineOrWindow, tradingCtx *bbgo.TradingContext) (reason string, ok bool) {
 	/*
 		if lookbackKline.AllDrop() {
-			trader.Notify("1m window all drop down (%d frames), do not buy: %+v", d.LookBackFrames, klineWindow)
+			Trader.Notify("1m window all drop down (%d frames), do not buy: %+v", d.LookBackFrames, klineWindow)
 		} else if lookbackKline.AllRise() {
-			trader.Notify("1m window all rise up (%d frames), do not sell: %+v", d.LookBackFrames, klineWindow)
+			Trader.Notify("1m window all rise up (%d frames), do not sell: %+v", d.LookBackFrames, klineWindow)
 		}
 	*/
 
