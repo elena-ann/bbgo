@@ -168,11 +168,19 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			available := balance.Available
 			volume = mostMaxAmount(volume, currentPrice, available * 0.9)
 		}
+		if volume * currentPrice < strategy.market.MinAmount {
+			return nil
+		}
 
 	case types.SideTypeSell:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.BaseCurrency] ; ok {
 			available := balance.Available
+
+			if available < strategy.market.MinLot {
+				return nil
+			}
+
 			volume = math.Min(volume, available * 0.9)
 		}
 	}
