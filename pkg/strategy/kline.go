@@ -30,17 +30,25 @@ type KLineStrategy struct {
 	// runtime variables
 	trader           *bbgo.Trader                 `json:"-"`
 	market           types.Market                 `json:"-"`
-	klineWindows     map[string]types.KLineWindow `json:"-"`
+	KLineWindows     map[string]types.KLineWindow `json:"-"`
 	cache            *util.VolatileMemory         `json:"-"`
 	volumeCalculator *VolumeCalculator            `json:"-"`
 
 	detectCallbacks []func(ok bool, reason string, detector *KLineDetector, kline types.KLineOrWindow)
 }
 
-func (strategy *KLineStrategy) Init(trader *bbgo.Trader, klineWindows map[string]types.KLineWindow) error {
+func (strategy *KLineStrategy) Init(trader *bbgo.Trader, stream *binance.PrivateStream) error {
 	strategy.trader = trader
 	strategy.cache = util.NewDetectorCache()
-	strategy.klineWindows = klineWindows
+
+	// configure stream handlers
+	stream.OnConnect(strategy.OnConnect)
+	stream.OnKLineClosedEvent(strategy.OnKLineClosedEvent)
+	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1m"})
+	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "5m"})
+	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1h"})
+	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1d"})
+
 
 	market, ok := types.FindMarket(strategy.Symbol)
 	if !ok {
@@ -49,8 +57,7 @@ func (strategy *KLineStrategy) Init(trader *bbgo.Trader, klineWindows map[string
 
 	strategy.market = market
 
-	klineWindow := klineWindows["1d"].Tail(60)
-
+	klineWindow := strategy.KLineWindows["1d"].Tail(60)
 	strategy.volumeCalculator = &VolumeCalculator{
 		Market:         market,
 		BaseQuantity:   strategy.BaseQuantity,
@@ -63,10 +70,6 @@ func (strategy *KLineStrategy) Init(trader *bbgo.Trader, klineWindows map[string
 
 // Subscribe defines what to subscribe for the strategy
 func (strategy *KLineStrategy) OnConnect(stream *binance.PrivateStream) {
-	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1m"})
-	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "5m"})
-	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1h"})
-	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1d"})
 }
 
 func (strategy *KLineStrategy) OnKLineClosedEvent(e *binance.KLineEvent) {
@@ -90,7 +93,7 @@ func (strategy *KLineStrategy) OnKLineClosedEvent(e *binance.KLineEvent) {
 
 		var kline types.KLineOrWindow = e.KLine
 		if detector.EnableLookBack {
-			klineWindow := strategy.klineWindows[e.KLine.Interval]
+			klineWindow := strategy.KLineWindows[e.KLine.Interval]
 			if len(klineWindow) >= detector.LookBackFrames {
 				kline = klineWindow.Tail(detector.LookBackFrames)
 			}
@@ -158,7 +161,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 }
 
 func (strategy *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
-	var klineWindow = strategy.klineWindows[kline.Interval]
+	var klineWindow = strategy.KLineWindows[kline.Interval]
 	klineWindow.Add(kline)
 
 	if strategy.KLineWindowSize > 0 {
@@ -279,9 +282,9 @@ func (d *KLineDetector) String() string {
 func (d *KLineDetector) Detect(kline types.KLineOrWindow, tradingCtx *bbgo.TradingContext) (reason string, ok bool) {
 	/*
 		if lookbackKline.AllDrop() {
-			trader.Infof("1m window all drop down (%d frames), do not buy: %+v", d.LookBackFrames, klineWindow)
+			trader.Notify("1m window all drop down (%d frames), do not buy: %+v", d.LookBackFrames, klineWindow)
 		} else if lookbackKline.AllRise() {
-			trader.Infof("1m window all rise up (%d frames), do not sell: %+v", d.LookBackFrames, klineWindow)
+			trader.Notify("1m window all rise up (%d frames), do not sell: %+v", d.LookBackFrames, klineWindow)
 		}
 	*/
 
