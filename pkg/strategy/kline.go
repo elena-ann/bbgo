@@ -39,17 +39,9 @@ type KLineStrategy struct {
 	detectCallbacks []func(ok bool, reason string, detector *KLineDetector, kline types.KLineOrWindow)
 }
 
-func (strategy *KLineStrategy) Init(trader *bbgo.Trader, stream *binance.PrivateStream) error {
+func (strategy *KLineStrategy) Init(trader *bbgo.Trader) error {
 	strategy.Trader = trader
 	strategy.cache = util.NewDetectorCache()
-
-	// configure stream handlers
-	stream.OnConnect(strategy.OnConnect)
-	stream.OnKLineClosedEvent(strategy.OnKLineClosedEvent)
-	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1m"})
-	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "5m"})
-	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1h"})
-	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1d"})
 
 	market, ok := types.FindMarket(strategy.Symbol)
 	if !ok {
@@ -68,6 +60,18 @@ func (strategy *KLineStrategy) Init(trader *bbgo.Trader, stream *binance.Private
 
 	return nil
 }
+
+func (strategy *KLineStrategy) OnNewStream(stream *binance.PrivateStream) error {
+	// configure stream handlers
+	stream.OnConnect(strategy.OnConnect)
+	stream.OnKLineClosedEvent(strategy.OnKLineClosedEvent)
+	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1m"})
+	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "5m"})
+	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1h"})
+	stream.Subscribe("kline", strategy.Symbol, binance.SubscribeOptions{Interval: "1d"})
+	return nil
+}
+
 
 // Subscribe defines what to subscribe for the strategy
 func (strategy *KLineStrategy) OnConnect(stream *binance.PrivateStream) {
