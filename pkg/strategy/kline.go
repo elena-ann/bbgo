@@ -168,6 +168,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			available := balance.Available
 			volume = mostMaxAmount(volume, currentPrice, available * 0.9)
 		}
+
 		if volume * currentPrice < strategy.market.MinAmount {
 			return nil
 		}
