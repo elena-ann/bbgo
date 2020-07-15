@@ -44,8 +44,7 @@ func (c *VolumeCalculator) minQuantity(volume float64) float64 {
 	return math.Max(c.Market.MinQuantity, volume)
 }
 
-func mostMaxAmount(volume float64, currentPrice float64, maxAmount float64) float64 {
-	// modify volume for the min amount
+func adjustVolumeByMaxAmount(volume float64, currentPrice float64, maxAmount float64) float64 {
 	amount := currentPrice * volume
 	if amount > maxAmount {
 		ratio := maxAmount / amount
@@ -56,7 +55,7 @@ func mostMaxAmount(volume float64, currentPrice float64, maxAmount float64) floa
 }
 
 
-func atLeastMinAmount(volume float64, currentPrice float64, minAmount float64) float64 {
+func adjustVolumeByMinAmount(volume float64, currentPrice float64, minAmount float64) float64 {
 	// modify volume for the min amount
 	amount := currentPrice * volume
 	if amount < minAmount {
@@ -77,7 +76,7 @@ func (c *VolumeCalculator) Volume(currentPrice float64, change float64, side typ
 	}
 
 	volume = c.minQuantity(volume)
-	volume = atLeastMinAmount(volume, currentPrice, c.Market.MinAmount)
+	volume = adjustVolumeByMinAmount(volume, currentPrice, c.Market.MinAmount)
 	return c.Market.CanonicalizeVolume(volume)
 }
 
