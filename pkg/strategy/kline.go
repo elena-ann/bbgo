@@ -26,7 +26,7 @@ type KLineStrategy struct {
 	Trader         types.Trader         `json:"-"`
 	TradingContext *bbgo.TradingContext `json:"-"`
 
-	Notifier *bbgo.SlackNotifier `json:"-"`
+	Notifier bbgo.Notifier `json:"-"`
 
 	market           types.Market                 `json:"-"`
 	KLineWindows     map[string]types.KLineWindow `json:"-"`
