@@ -2,6 +2,7 @@ package strategy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -14,6 +15,8 @@ import (
 	"github.com/c9s/bbgo/pkg/slack/slackstyle"
 	"github.com/c9s/bbgo/pkg/util"
 )
+
+var ErrInsufficientBalance = errors.New("insufficient balance")
 
 //go:generate callbackgen -type KLineStrategy
 type KLineStrategy struct {
@@ -115,7 +118,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				strategy.Notifier.Notify(trendIcon+" *TRIGGERED* ", detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
 			}
 
-			var order = strategy.NewOrder(klineOrWindow, strategy.TradingContext)
+			var order, _ = strategy.NewOrder(klineOrWindow, strategy.TradingContext)
 			if order != nil {
 				var delay = time.Duration(detector.DelayMilliseconds) * time.Millisecond
 
@@ -136,7 +139,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 	}
 }
 
-func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *bbgo.TradingContext) *types.Order {
+func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *bbgo.TradingContext) (*types.Order, error) {
 	var trend = kline.GetTrend()
 
 	var side types.SideType
@@ -152,16 +155,17 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	tradingCtx.Lock()
 	defer tradingCtx.Unlock()
 
+	maxExposure := 0.3
+
 	switch side {
 	case types.SideTypeBuy:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.QuoteCurrency]; ok {
 			available := balance.Available
-			volume = adjustVolumeByMaxAmount(volume, currentPrice, available*0.9)
-		}
-
-		if volume*currentPrice < strategy.market.MinAmount {
-			return nil
+			volume = adjustVolumeByMaxAmount(volume, currentPrice, available*maxExposure)
+			if volume * currentPrice < strategy.market.MinAmount {
+				return nil, ErrInsufficientBalance
+			}
 		}
 
 	case types.SideTypeSell:
@@ -169,11 +173,11 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 		if balance, ok := tradingCtx.Balances[strategy.market.BaseCurrency]; ok {
 			available := balance.Available
 
-			if available < strategy.market.MinLot {
-				return nil
+			if available < strategy.market.MinQuantity {
+				return nil, ErrInsufficientBalance
 			}
 
-			volume = math.Min(volume, available*0.9)
+			volume = math.Min(volume, available*maxExposure)
 		}
 	}
 
@@ -182,7 +186,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 		Type:      types.OrderTypeMarket,
 		Side:      side,
 		VolumeStr: tradingCtx.Market.FormatVolume(volume),
-	}
+	}, nil
 }
 
 func (strategy *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
