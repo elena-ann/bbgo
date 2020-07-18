@@ -24,6 +24,7 @@ type KLineStrategy struct {
 	Detectors       []KLineDetector `json:"detectors"`
 	BaseQuantity    float64         `json:"baseQuantity"`
 	KLineWindowSize int             `json:"kLineWindowSize"`
+	MaxExposure     float64         `json:"maxExposure"`
 
 	// runtime variables
 	Trader         types.Trader         `json:"-"`
@@ -156,6 +157,9 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	defer tradingCtx.Unlock()
 
 	maxExposure := 0.3
+	if util.NotZero(strategy.MaxExposure) {
+		maxExposure = strategy.MaxExposure
+	}
 
 	switch side {
 	case types.SideTypeBuy:
@@ -163,7 +167,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 		if balance, ok := tradingCtx.Balances[strategy.market.QuoteCurrency]; ok {
 			available := balance.Available
 			volume = adjustVolumeByMaxAmount(volume, currentPrice, available*maxExposure)
-			if volume * currentPrice < strategy.market.MinAmount {
+			if volume*currentPrice < strategy.market.MinAmount {
 				return nil, ErrInsufficientBalance
 			}
 		}
