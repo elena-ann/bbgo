@@ -26,6 +26,9 @@ type KLineStrategy struct {
 	KLineWindowSize int             `json:"kLineWindowSize"`
 	MaxExposure     float64         `json:"maxExposure"`
 
+	StopBuyRatio  float64 `json:"stopBuyRatio"`
+	StopSellRatio float64 `json:"stopSellRatio"`
+
 	// runtime variables
 	Trader         types.Trader         `json:"-"`
 	TradingContext *bbgo.TradingContext `json:"-"`
@@ -201,6 +204,8 @@ func (strategy *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
 		klineWindow.Truncate(strategy.KLineWindowSize)
 	}
 
+	strategy.volumeCalculator.HistoricalHigh = math.Max(strategy.volumeCalculator.HistoricalHigh, kline.GetHigh())
+	strategy.volumeCalculator.HistoricalLow = math.Min(strategy.volumeCalculator.HistoricalLow, kline.GetLow())
 	return klineWindow
 }
 
