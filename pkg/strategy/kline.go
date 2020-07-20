@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	log "github.com/sirupsen/logrus"
 	"math"
 	"strconv"
 	"time"
@@ -56,11 +57,16 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 	strategy.market = market
 
 	klineWindow := strategy.KLineWindows["1d"].Tail(60)
+	high := klineWindow.GetHigh()
+	low := klineWindow.GetLow()
+
+	log.Infof("[strategy] historical high / low: %f / %f", high, low)
+
 	strategy.volumeCalculator = &VolumeCalculator{
 		Market:         market,
 		BaseQuantity:   strategy.BaseQuantity,
-		HistoricalHigh: klineWindow.GetHigh(),
-		HistoricalLow:  klineWindow.GetLow(),
+		HistoricalHigh: high,
+		HistoricalLow:  low,
 	}
 
 	return nil
