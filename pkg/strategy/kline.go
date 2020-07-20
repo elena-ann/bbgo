@@ -17,7 +17,8 @@ import (
 	"github.com/c9s/bbgo/pkg/util"
 )
 
-var ErrInsufficientBalance = errors.New("insufficient balance")
+var ErrInsufficientBaseBalance = errors.New("insufficient base balance")
+var ErrInsufficientQuoteBalance = errors.New("insufficient quote balance")
 
 //go:generate callbackgen -type KLineStrategy
 type KLineStrategy struct {
@@ -25,6 +26,8 @@ type KLineStrategy struct {
 	Detectors       []KLineDetector `json:"detectors"`
 	BaseQuantity    float64         `json:"baseQuantity"`
 	KLineWindowSize int             `json:"kLineWindowSize"`
+
+	// MaxExposure will be deprecated
 	MaxExposure     float64         `json:"maxExposure"`
 
 	StopBuyRatio  float64 `json:"stopBuyRatio"`
@@ -109,7 +112,6 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 		}
 
 		reason, ok := detector.Detect(klineOrWindow, strategy.TradingContext)
-
 		strategy.EmitDetect(ok, reason, &detector, klineOrWindow)
 
 		if !ok {
@@ -128,8 +130,55 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				strategy.Notifier.Notify(trendIcon+" *TRIGGERED* ", detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
 			}
 
-			var order, _ = strategy.NewOrder(klineOrWindow, strategy.TradingContext)
+
+			var order, err = strategy.NewOrder(klineOrWindow, strategy.TradingContext)
+			if err != nil {
+				strategy.Notifier.Notify("order error: %v", err)
+				return
+			}
+
 			if order != nil {
+				recentKLines := strategy.KLineWindows[kline.Interval]
+				switch kline.Interval {
+				case "1m":
+					recentKLines = recentKLines.Tail(60)
+				case "5m":
+					recentKLines = recentKLines.Tail(30)
+				case "1h":
+					recentKLines = recentKLines.Tail(15)
+				case "1d":
+					recentKLines = recentKLines.Tail(7)
+
+				default:
+					recentKLines = recentKLines.Tail(3)
+
+				}
+
+				recentHigh := recentKLines.GetHigh()
+				recentLow := recentKLines.GetLow()
+				recentChange := recentHigh - recentLow
+				closedPrice := kline.GetClose()
+
+				stopBuyPrice := recentHigh - strategy.StopBuyRatio * recentChange
+				stopSellPrice := recentLow + strategy.StopSellRatio * recentChange
+
+				switch order.Side {
+
+				case types.SideTypeSell:
+					if closedPrice < stopSellPrice {
+						strategy.Notifier.Notify("stop sell at price %f", stopSellPrice)
+						return
+					}
+
+				case types.SideTypeBuy:
+					if closedPrice > stopBuyPrice {
+						strategy.Notifier.Notify("stop buy at price %f", stopBuyPrice)
+						return
+					}
+
+				}
+
+
 				var delay = time.Duration(detector.DelayMilliseconds) * time.Millisecond
 
 				// add a delay
@@ -177,7 +226,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			available := balance.Available
 			volume = adjustVolumeByMaxAmount(volume, currentPrice, available*maxExposure)
 			if volume*currentPrice < strategy.market.MinAmount {
-				return nil, ErrInsufficientBalance
+				return nil, ErrInsufficientQuoteBalance
 			}
 		}
 
@@ -187,7 +236,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			available := balance.Available
 
 			if available < strategy.market.MinQuantity {
-				return nil, ErrInsufficientBalance
+				return nil, ErrInsufficientBaseBalance
 			}
 
 			volume = math.Min(volume, available*maxExposure)
