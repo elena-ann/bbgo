@@ -27,9 +27,6 @@ type KLineStrategy struct {
 	BaseQuantity    float64         `json:"baseQuantity"`
 	KLineWindowSize int             `json:"kLineWindowSize"`
 
-	// MaxExposure will be deprecated
-	MaxExposure     float64         `json:"maxExposure"`
-
 	StopBuyRatio  float64 `json:"stopBuyRatio"`
 	StopSellRatio float64 `json:"stopSellRatio"`
 
@@ -214,10 +211,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	tradingCtx.Lock()
 	defer tradingCtx.Unlock()
 
-	maxExposure := 0.3
-	if util.NotZero(strategy.MaxExposure) {
-		maxExposure = strategy.MaxExposure
-	}
+	maxExposure := 0.5
 
 	switch side {
 	case types.SideTypeBuy:
