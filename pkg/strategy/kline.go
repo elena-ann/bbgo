@@ -69,6 +69,7 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 		Fields: []slack.AttachmentField{
 			{Title: "High", Value: market.FormatPrice(high), Short: true},
 			{Title: "Low", Value: market.FormatPrice(low), Short: true},
+			{Title: "Current", Value: market.FormatPrice(klineWindow.GetClose()), Short: true},
 		},
 	})
 
