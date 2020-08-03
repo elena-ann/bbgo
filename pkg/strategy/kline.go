@@ -127,7 +127,6 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				strategy.Notifier.Notify(trendIcon+" *TRIGGERED* ", detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
 			}
 
-
 			var order, err = strategy.NewOrder(klineOrWindow, strategy.TradingContext)
 			if err != nil {
 				strategy.Notifier.Notify("order error: %v", err)
@@ -138,13 +137,13 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				recentKLines := strategy.KLineWindows[kline.Interval]
 				switch kline.Interval {
 				case "1m":
-					recentKLines = recentKLines.Tail(60 * 8)
+					recentKLines = recentKLines.Tail(60 * 5)
 				case "5m":
-					recentKLines = recentKLines.Tail(28 * 8)
+					recentKLines = recentKLines.Tail(12 * 5)
 				case "1h":
-					recentKLines = recentKLines.Tail(16)
+					recentKLines = recentKLines.Tail(1 * 5)
 				case "1d":
-					recentKLines = recentKLines.Tail(7)
+					recentKLines = recentKLines.Tail(1 * 7)
 
 				default:
 					recentKLines = recentKLines.Tail(3)
@@ -156,8 +155,8 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				recentChange := recentHigh - recentLow
 				closedPrice := kline.GetClose()
 
-				stopBuyPrice := recentHigh - strategy.StopBuyRatio * recentChange
-				stopSellPrice := recentLow + strategy.StopSellRatio * recentChange
+				stopBuyPrice := recentHigh - strategy.StopBuyRatio*recentChange
+				stopSellPrice := recentLow + strategy.StopSellRatio*recentChange
 
 				switch order.Side {
 
@@ -174,7 +173,6 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 					}
 
 				}
-
 
 				var delay = time.Duration(detector.DelayMilliseconds) * time.Millisecond
 
