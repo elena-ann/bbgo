@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"math"
 	"strconv"
 	"time"
@@ -60,9 +59,7 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 	high := klineWindow.GetHigh()
 	low := klineWindow.GetLow()
 
-	log.Infof("[strategy] historical high / low: %f / %f", high, low)
-
-	strategy.Notifier.Notify("Here is the historical price for strategy", slack.Attachment{
+	strategy.Notifier.Notify("Here is the historical price for strategy: high / low %f / %f", high, low, slack.Attachment{
 		Title:   fmt.Sprintf("%s Historical Price 30 days high and low", strategy.Symbol),
 		Pretext: "",
 		Text:    "",
