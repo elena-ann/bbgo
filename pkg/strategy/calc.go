@@ -55,15 +55,15 @@ func adjustVolumeByMaxAmount(quantity float64, currentPrice float64, maxAmount f
 }
 
 
-func adjustVolumeByMinAmount(volume float64, currentPrice float64, minAmount float64) float64 {
-	// modify volume for the min amount
-	amount := currentPrice * volume
+func adjustVolumeByMinAmount(quantity float64, currentPrice float64, minAmount float64) float64 {
+	// modify quantity for the min amount
+	amount := currentPrice * quantity
 	if amount < minAmount {
 		ratio := minAmount / amount
-		volume *= ratio
+		quantity *= ratio
 	}
 
-	return volume
+	return quantity
 }
 
 func (c *VolumeCalculator) Volume(currentPrice float64, change float64, side types.SideType) float64 {

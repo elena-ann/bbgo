@@ -214,10 +214,15 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 
 		if balance, ok := tradingCtx.Balances[strategy.market.QuoteCurrency]; ok {
 			available := balance.Available * 0.5
+
+			if available < strategy.market.MinAmount {
+				return nil, fmt.Errorf("insufficient quote balance: %f < min amount %f", available, strategy.market.MinAmount)
+			}
+
 			volume = adjustVolumeByMaxAmount(volume, currentPrice, available)
 			amount := volume * currentPrice
 			if amount < strategy.market.MinAmount {
-				return nil, fmt.Errorf("insufficient quote balance: %f < min amount %f (balance %f)", amount, strategy.market.MinAmount, available)
+				return nil, fmt.Errorf("amount too small: %f < min amount %f", amount, strategy.market.MinAmount)
 			}
 		}
 
