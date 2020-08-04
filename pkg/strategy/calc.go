@@ -22,7 +22,7 @@ func (c *VolumeCalculator) modifyBuyVolume(price float64) float64 {
 	pessimisticFactor := 0.1
 	targetPrice := c.HistoricalLow * (1 - pessimisticFactor) // we will get 1 at price 7500, and more below 7500
 	flatness := maxChange * 0.3                             // higher number buys more in the middle section. higher number gets more flat line, reduced to 0 at price 2000 * 10
-	return math.Exp(-(price - targetPrice) / flatness)
+	return math.Min(1.0, math.Exp(-(price - targetPrice) / flatness))
 }
 
 func (c *VolumeCalculator) modifySellVolume(price float64) float64 {
@@ -31,13 +31,15 @@ func (c *VolumeCalculator) modifySellVolume(price float64) float64 {
 	optimismFactor := 0.1
 	targetPrice := c.HistoricalHigh * (1 + optimismFactor) // target to sell most x1 at 10000.0
 	flatness := maxChange * 0.22                           // higher number sells more in the middle section, lower number sells fewer in the middle section.
-	return math.Exp((price - targetPrice) / flatness)
+	return math.Min(1.0, math.Exp((price - targetPrice) / flatness))
 }
 
 func (c *VolumeCalculator) VolumeByChange(change float64) float64 {
 	maxChange := c.HistoricalHigh - c.HistoricalLow
-	flatness := maxChange * 0.3
-	return math.Exp((math.Abs(change))/flatness)
+	flatness := maxChange * 0.22
+
+	// double
+	return math.Min(2.0, math.Exp((math.Abs(change))/flatness))
 }
 
 func (c *VolumeCalculator) minQuantity(volume float64) float64 {
