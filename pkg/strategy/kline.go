@@ -2,7 +2,6 @@ package strategy
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -15,10 +14,6 @@ import (
 	"github.com/c9s/bbgo/pkg/slack/slackstyle"
 	"github.com/c9s/bbgo/pkg/util"
 )
-
-var ErrInsufficientBaseBalance = errors.New("insufficient base balance")
-var ErrInsufficientQuoteBalance = errors.New("insufficient quote balance")
-var ErrMinLot = errors.New("quantity is less than minimal lot")
 
 //go:generate callbackgen -type KLineStrategy
 type KLineStrategy struct {
