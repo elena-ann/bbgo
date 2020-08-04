@@ -138,7 +138,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 
 			var order, err = strategy.NewOrder(klineOrWindow, strategy.TradingContext)
 			if err != nil {
-				strategy.Notifier.Notify("order error: %v", err)
+				strategy.Notifier.Notify("%s order error: %v", kline.Symbol, err)
 				return
 			}
 
@@ -171,7 +171,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 
 				case types.SideTypeSell:
 					if closedPrice < stopSellPrice {
-						strategy.Notifier.Notify("stop sell at price %f", stopSellPrice)
+						strategy.Notifier.Notify("%s stop sell at price %f", kline.Symbol, stopSellPrice)
 						return
 					}
 
@@ -179,22 +179,13 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 
 				case types.SideTypeBuy:
 					if closedPrice > stopBuyPrice {
-						strategy.Notifier.Notify("stop buy at price %f", stopBuyPrice)
+						strategy.Notifier.Notify("%s stop buy at price %f", kline.Symbol, stopBuyPrice)
 						return
 					}
 
 				}
 
-				var delay = time.Duration(detector.DelayMilliseconds) * time.Millisecond
-
-				// add a delay
-				if delay > 0 {
-					time.AfterFunc(delay, func() {
-						strategy.Trader.SubmitOrder(ctx, order)
-					})
-				} else {
-					strategy.Trader.SubmitOrder(ctx, order)
-				}
+				strategy.Trader.SubmitOrder(ctx, order)
 			}
 
 			if detector.Stop {
@@ -220,16 +211,15 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	tradingCtx.Lock()
 	defer tradingCtx.Unlock()
 
-	maxExposure := 0.5
-
 	switch side {
 	case types.SideTypeBuy:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.QuoteCurrency]; ok {
 			available := balance.Available
-			volume = adjustVolumeByMaxAmount(volume, currentPrice, available*maxExposure)
-			if volume*currentPrice < strategy.market.MinAmount {
-				return nil, ErrInsufficientQuoteBalance
+			volume = adjustVolumeByMaxAmount(volume, currentPrice, available)
+			amount := volume*currentPrice
+			if amount < strategy.market.MinAmount {
+				return nil, fmt.Errorf("insufficient quote balance: %f < min amount %f", available, amount)
 			}
 		}
 
@@ -239,19 +229,24 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			available := balance.Available
 
 			if available < strategy.market.MinQuantity {
-				return nil, ErrInsufficientBaseBalance
+				return nil, fmt.Errorf("insufficient base balance: %f > minimal quantity %f", available, strategy.market.MinQuantity)
 			}
 
 			// price tick
 			// 2 -> 1.0
 			// 4 -> 0.01
+			volume = math.Min(volume, available)
+
 			tick := math.Pow10(-strategy.market.PricePrecision + 2)
 			stockQuantity := strategy.TradingContext.StockManager.Stocks.QuantityBelowPrice(currentPrice - tick)
+			if math.Round(stockQuantity * 1e8) == 0.0 {
+				return nil, fmt.Errorf("no profitable stock quantity")
+			}
+
 			volume = math.Min(volume, stockQuantity)
-			volume = math.Min(volume, available*maxExposure)
 
 			if volume < tradingCtx.Market.MinLot {
-				return nil, ErrMinLot
+				return nil, fmt.Errorf("quantity %f less than min lot %f", volume, tradingCtx.Market.MinLot)
 			}
 
 		}
