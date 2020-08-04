@@ -234,9 +234,9 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			volume = math.Min(volume, available)
 
 			// price tick
-			// 2 -> 0.01 -> 1.0
-			// 4 -> 0.0001 -> 0.01
-			tick := math.Pow10(-strategy.market.PricePrecision + 2)
+			// 2 -> 0.01 -> 0.1
+			// 4 -> 0.0001 -> 0.001
+			tick := math.Pow10(-strategy.market.PricePrecision + 1)
 			targetPrice := currentPrice - strategy.MinProfitSpread - tick
 			stockQuantity := strategy.TradingContext.StockManager.Stocks.QuantityBelowPrice(targetPrice)
 			if math.Round(stockQuantity*1e8) == 0.0 {
