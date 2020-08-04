@@ -237,10 +237,12 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			// 2 -> 0.01 -> 0.1
 			// 4 -> 0.0001 -> 0.001
 			tick := math.Pow10(-strategy.market.PricePrecision + 1)
-			targetPrice := currentPrice - strategy.MinProfitSpread - tick
+			minProfitSpread := math.Max(strategy.MinProfitSpread, tick)
+			targetPrice := currentPrice - minProfitSpread
+
 			stockQuantity := strategy.TradingContext.StockManager.Stocks.QuantityBelowPrice(targetPrice)
 			if math.Round(stockQuantity*1e8) == 0.0 {
-				return nil, fmt.Errorf("profitable stock not found: target price %f", targetPrice)
+				return nil, fmt.Errorf("profitable stock not found: target price %f, profit spread: %f", targetPrice, minProfitSpread)
 			}
 
 			volume = math.Min(volume, stockQuantity)
