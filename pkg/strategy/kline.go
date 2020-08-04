@@ -22,6 +22,7 @@ type KLineStrategy struct {
 	BaseQuantity    float64         `json:"baseQuantity"`
 	KLineWindowSize int             `json:"kLineWindowSize"`
 
+	MinProfitSpread  float64 `json:"minProfitSpread"`
 	StopBuyRatio  float64 `json:"stopBuyRatio"`
 	StopSellRatio float64 `json:"stopSellRatio"`
 
@@ -230,15 +231,16 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 				return nil, fmt.Errorf("insufficient base balance: %f > minimal quantity %f", available, strategy.market.MinQuantity)
 			}
 
-			// price tick
-			// 2 -> 1.0
-			// 4 -> 0.01
 			volume = math.Min(volume, available)
 
+			// price tick
+			// 2 -> 0.01 -> 1.0
+			// 4 -> 0.0001 -> 0.01
 			tick := math.Pow10(-strategy.market.PricePrecision + 2)
-			stockQuantity := strategy.TradingContext.StockManager.Stocks.QuantityBelowPrice(currentPrice - tick)
+			targetPrice := currentPrice - strategy.MinProfitSpread - tick
+			stockQuantity := strategy.TradingContext.StockManager.Stocks.QuantityBelowPrice(targetPrice)
 			if math.Round(stockQuantity*1e8) == 0.0 {
-				return nil, fmt.Errorf("no profitable stock quantity")
+				return nil, fmt.Errorf("profitable stock not found: target price %f", targetPrice)
 			}
 
 			volume = math.Min(volume, stockQuantity)
