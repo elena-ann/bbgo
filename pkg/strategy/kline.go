@@ -175,8 +175,6 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 						return
 					}
 
-
-
 				case types.SideTypeBuy:
 					if closedPrice > stopBuyPrice {
 						strategy.Notifier.Notify("%s stop buy at price %f", kline.Symbol, stopBuyPrice)
@@ -215,11 +213,11 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	case types.SideTypeBuy:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.QuoteCurrency]; ok {
-			available := balance.Available
+			available := balance.Available * 0.5
 			volume = adjustVolumeByMaxAmount(volume, currentPrice, available)
-			amount := volume*currentPrice
+			amount := volume * currentPrice
 			if amount < strategy.market.MinAmount {
-				return nil, fmt.Errorf("insufficient quote balance: %f < min amount %f", available, amount)
+				return nil, fmt.Errorf("insufficient quote balance: %f < min amount %f (balance %f)", amount, strategy.market.MinAmount, available)
 			}
 		}
 
@@ -239,7 +237,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 
 			tick := math.Pow10(-strategy.market.PricePrecision + 2)
 			stockQuantity := strategy.TradingContext.StockManager.Stocks.QuantityBelowPrice(currentPrice - tick)
-			if math.Round(stockQuantity * 1e8) == 0.0 {
+			if math.Round(stockQuantity*1e8) == 0.0 {
 				return nil, fmt.Errorf("no profitable stock quantity")
 			}
 
@@ -251,7 +249,6 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 
 		}
 	}
-
 
 	return &types.Order{
 		Symbol:    strategy.Symbol,

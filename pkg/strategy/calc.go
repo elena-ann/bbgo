@@ -44,14 +44,14 @@ func (c *VolumeCalculator) minQuantity(volume float64) float64 {
 	return math.Max(c.Market.MinQuantity, volume)
 }
 
-func adjustVolumeByMaxAmount(volume float64, currentPrice float64, maxAmount float64) float64 {
-	amount := currentPrice * volume
+func adjustVolumeByMaxAmount(quantity float64, currentPrice float64, maxAmount float64) float64 {
+	amount := currentPrice * quantity
 	if amount > maxAmount {
 		ratio := maxAmount / amount
-		volume *= ratio
+		quantity *= ratio
 	}
 
-	return volume
+	return quantity
 }
 
 
