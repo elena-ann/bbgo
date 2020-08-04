@@ -18,6 +18,7 @@ import (
 
 var ErrInsufficientBaseBalance = errors.New("insufficient base balance")
 var ErrInsufficientQuoteBalance = errors.New("insufficient quote balance")
+var ErrMinLot = errors.New("quantity is less than minimal lot")
 
 //go:generate callbackgen -type KLineStrategy
 type KLineStrategy struct {
@@ -174,6 +175,8 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 						return
 					}
 
+
+
 				case types.SideTypeBuy:
 					if closedPrice > stopBuyPrice {
 						strategy.Notifier.Notify("stop buy at price %f", stopBuyPrice)
@@ -239,9 +242,21 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 				return nil, ErrInsufficientBaseBalance
 			}
 
+			// price tick
+			// 2 -> 1.0
+			// 4 -> 0.01
+			tick := math.Pow10(-strategy.market.PricePrecision + 2)
+			stockQuantity := strategy.TradingContext.StockManager.Stocks.QuantityBelowPrice(currentPrice - tick)
+			volume = math.Min(volume, stockQuantity)
 			volume = math.Min(volume, available*maxExposure)
+
+			if volume < tradingCtx.Market.MinLot {
+				return nil, ErrMinLot
+			}
+
 		}
 	}
+
 
 	return &types.Order{
 		Symbol:    strategy.Symbol,
