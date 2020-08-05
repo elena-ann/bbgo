@@ -142,11 +142,11 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				recentKLines := strategy.KLineWindows[kline.Interval]
 				switch kline.Interval {
 				case "1m":
-					recentKLines = recentKLines.Tail(60 * 5)
+					recentKLines = recentKLines.Tail(60 * 8) // 8 hours
 				case "5m":
-					recentKLines = recentKLines.Tail(12 * 5)
+					recentKLines = recentKLines.Tail(12 * 5 * 8) // 8 hours
 				case "1h":
-					recentKLines = recentKLines.Tail(1 * 5)
+					recentKLines = recentKLines.Tail(1 * 8) // 8 hours
 				case "1d":
 					recentKLines = recentKLines.Tail(1 * 7)
 
@@ -160,20 +160,37 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				recentChange := recentHigh - recentLow
 				closedPrice := kline.GetClose()
 
-				stopBuyPrice := recentHigh - strategy.StopBuyRatio*recentChange
-				stopSellPrice := recentLow + strategy.StopSellRatio*recentChange
-
 				switch order.Side {
 
 				case types.SideTypeSell:
-					if closedPrice < stopSellPrice {
-						strategy.Notifier.Notify("%s stop sell at price %f", kline.Symbol, stopSellPrice)
+					stopPrice := recentLow + strategy.StopSellRatio*recentChange
+					if closedPrice < stopPrice {
+						attachment := slack.Attachment{
+							Title: "Stop Sell Condition",
+							Fields: []slack.AttachmentField{
+								{ Short: true, Title: "Price", Value: strategy.market.FormatPrice(stopPrice)},
+								{ Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopSellRatio, 2)},
+								{ Short: true, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
+								{ Short: true, Title: "Recent Low", Value: strategy.market.FormatPrice(recentLow) },
+							},
+						}
+						strategy.Notifier.Notify(":raised_hands: %s stop sell", kline.Symbol, attachment, recentKLines)
 						return
 					}
 
 				case types.SideTypeBuy:
-					if closedPrice > stopBuyPrice {
-						strategy.Notifier.Notify("%s stop buy at price %f", kline.Symbol, stopBuyPrice)
+					stopPrice := recentHigh - strategy.StopBuyRatio*recentChange
+					if closedPrice > stopPrice {
+						attachment := slack.Attachment{
+							Title: "Stop Buy Condition",
+							Fields: []slack.AttachmentField{
+								{ Short: true, Title: "Price", Value: strategy.market.FormatPrice(stopPrice)},
+								{ Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopBuyRatio, 2)},
+								{ Short: true, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
+								{ Short: true, Title: "Recent High", Value: strategy.market.FormatPrice(recentHigh) },
+							},
+						}
+						strategy.Notifier.Notify(":raised_hands: %s stop buy", kline.Symbol, attachment, recentKLines)
 						return
 					}
 
