@@ -22,9 +22,9 @@ type KLineStrategy struct {
 	BaseQuantity    float64         `json:"baseQuantity"`
 	KLineWindowSize int             `json:"kLineWindowSize"`
 
-	MinProfitSpread  float64 `json:"minProfitSpread"`
-	StopBuyRatio  float64 `json:"stopBuyRatio"`
-	StopSellRatio float64 `json:"stopSellRatio"`
+	MinProfitSpread float64 `json:"minProfitSpread"`
+	StopBuyRatio    float64 `json:"stopBuyRatio"`
+	StopSellRatio   float64 `json:"stopSellRatio"`
 
 	// runtime variables
 	Trader         types.Trader         `json:"-"`
@@ -138,66 +138,68 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				return
 			}
 
-			if order != nil {
-				recentKLines := strategy.KLineWindows[kline.Interval]
-				switch kline.Interval {
-				case "1m":
-					recentKLines = recentKLines.Tail(60 * 8) // 8 hours
-				case "5m":
-					recentKLines = recentKLines.Tail(12 * 5 * 8) // 8 hours
-				case "1h":
-					recentKLines = recentKLines.Tail(1 * 8) // 8 hours
-				case "1d":
-					recentKLines = recentKLines.Tail(1 * 7)
-
-				default:
-					recentKLines = recentKLines.Tail(3)
-
-				}
-
-				recentHigh := recentKLines.GetHigh()
-				recentLow := recentKLines.GetLow()
-				recentChange := recentHigh - recentLow
-				closedPrice := kline.GetClose()
-
-				switch order.Side {
-
-				case types.SideTypeSell:
-					stopPrice := recentLow + strategy.StopSellRatio*recentChange
-					if closedPrice < stopPrice {
-						attachment := slack.Attachment{
-							Title: "Stop Sell Condition",
-							Fields: []slack.AttachmentField{
-								{ Short: true, Title: "Price", Value: strategy.market.FormatPrice(stopPrice)},
-								{ Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopSellRatio, 2)},
-								{ Short: true, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
-								{ Short: true, Title: "Recent Low", Value: strategy.market.FormatPrice(recentLow) },
-							},
-						}
-						strategy.Notifier.Notify(":raised_hands: %s stop sell", kline.Symbol, attachment, recentKLines)
-						return
-					}
-
-				case types.SideTypeBuy:
-					stopPrice := recentHigh - strategy.StopBuyRatio*recentChange
-					if closedPrice > stopPrice {
-						attachment := slack.Attachment{
-							Title: "Stop Buy Condition",
-							Fields: []slack.AttachmentField{
-								{ Short: true, Title: "Price", Value: strategy.market.FormatPrice(stopPrice)},
-								{ Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopBuyRatio, 2)},
-								{ Short: true, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
-								{ Short: true, Title: "Recent High", Value: strategy.market.FormatPrice(recentHigh) },
-							},
-						}
-						strategy.Notifier.Notify(":raised_hands: %s stop buy", kline.Symbol, attachment, recentKLines)
-						return
-					}
-
-				}
-
-				strategy.Trader.SubmitOrder(ctx, order)
+			if order == nil {
+				return
 			}
+
+			recentKLines := strategy.KLineWindows[kline.Interval]
+			switch kline.Interval {
+			case "1m":
+				recentKLines = recentKLines.Tail(60 * 8) // 8 hours
+			case "5m":
+				recentKLines = recentKLines.Tail(12 * 5 * 8) // 8 hours
+			case "1h":
+				recentKLines = recentKLines.Tail(1 * 8) // 8 hours
+			case "1d":
+				recentKLines = recentKLines.Tail(1 * 7)
+
+			default:
+				recentKLines = recentKLines.Tail(3)
+
+			}
+
+			recentHigh := recentKLines.GetHigh()
+			recentLow := recentKLines.GetLow()
+			recentChange := recentHigh - recentLow
+			closedPrice := kline.GetClose()
+
+			switch order.Side {
+
+			case types.SideTypeSell:
+				stopPrice := recentLow + strategy.StopSellRatio*recentChange
+				if closedPrice < stopPrice {
+					attachment := slack.Attachment{
+						Title: "Stop Sell Condition",
+						Fields: []slack.AttachmentField{
+							{Short: true, Title: "Price", Value: strategy.market.FormatPrice(stopPrice)},
+							{Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopSellRatio, 2)},
+							{Short: true, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
+							{Short: true, Title: "Recent Low", Value: strategy.market.FormatPrice(recentLow)},
+						},
+					}
+					strategy.Notifier.Notify(":raised_hands: %s stop sell", kline.Symbol, attachment, recentKLines)
+					return
+				}
+
+			case types.SideTypeBuy:
+				stopPrice := recentHigh - strategy.StopBuyRatio*recentChange
+				if closedPrice > stopPrice {
+					attachment := slack.Attachment{
+						Title: "Stop Buy Condition",
+						Fields: []slack.AttachmentField{
+							{Short: true, Title: "Price", Value: strategy.market.FormatPrice(stopPrice)},
+							{Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopBuyRatio, 2)},
+							{Short: true, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
+							{Short: true, Title: "Recent High", Value: strategy.market.FormatPrice(recentHigh)},
+						},
+					}
+					strategy.Notifier.Notify(":raised_hands: %s stop buy", kline.Symbol, attachment, recentKLines)
+					return
+				}
+
+			}
+
+			strategy.Trader.SubmitOrder(ctx, order)
 
 			if detector.Stop {
 				return
@@ -232,6 +234,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 				return nil, fmt.Errorf("insufficient quote balance: %f < min amount %f", available, strategy.market.MinAmount)
 			}
 
+			volume = adjustVolumeByMinAmount(volume, currentPrice, strategy.market.MinAmount)
 			volume = adjustVolumeByMaxAmount(volume, currentPrice, available)
 			amount := volume * currentPrice
 			if amount < strategy.market.MinAmount {
