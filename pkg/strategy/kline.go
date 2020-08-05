@@ -52,7 +52,7 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 
 	strategy.market = market
 
-	klineWindow := strategy.KLineWindows["1d"].Tail(30)
+	klineWindow := strategy.KLineWindows["1d"].Tail(14)
 	high := klineWindow.GetHigh()
 	low := klineWindow.GetLow()
 
