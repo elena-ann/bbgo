@@ -123,7 +123,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				(strategy.cache.IsTextFresh(reason, 30*time.Minute) &&
 					strategy.cache.IsObjectFresh(&detector, 10*time.Minute)) {
 
-				strategy.Notifier.Notify(trendIcon+" *SKIP* reason: %s", reason, detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
+				strategy.Notifier.Notify(trendIcon+" *SKIP* reason: %s", reason, detector, kline)
 			}
 
 		} else {
