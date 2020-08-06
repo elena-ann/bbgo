@@ -231,13 +231,17 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	case types.SideTypeBuy:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.QuoteCurrency]; ok {
-			available := balance.Available * 0.5
+			if balance.Available < 2000.0 {
+				return nil, fmt.Errorf("quote balance level is too low: %s", bbgo.USD.FormatMoneyFloat64(balance.Available))
+			}
+
+			available := math.Max(0.0, balance.Available - 2000.0)
 
 			if available < strategy.market.MinAmount {
 				return nil, fmt.Errorf("insufficient quote balance: %f < min amount %f", available, strategy.market.MinAmount)
 			}
 
-			volume = adjustVolumeByMinAmount(volume, currentPrice, strategy.market.MinAmount)
+			volume = adjustVolumeByMinAmount(volume, currentPrice, strategy.market.MinAmount * 1.1)
 			volume = adjustVolumeByMaxAmount(volume, currentPrice, available)
 			amount := volume * currentPrice
 			if amount < strategy.market.MinAmount {
