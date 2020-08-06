@@ -58,7 +58,7 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 	low := klineWindow.GetLow()
 
 	strategy.Notifier.Notify("Here is the historical price for strategy: high / low %f / %f", high, low, slack.Attachment{
-		Title:   fmt.Sprintf("%s Historical Price %d days high and low", days, strategy.Symbol),
+		Title:   fmt.Sprintf("%s Historical Price %d days high and low", strategy.Symbol, days),
 		Pretext: "",
 		Text:    "",
 		Fields: []slack.AttachmentField{
