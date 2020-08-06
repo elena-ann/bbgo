@@ -128,9 +128,9 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 
 		} else {
 			if len(reason) > 0 {
-				strategy.Notifier.Notify(trendIcon+" *TRIGGERED* reason: %s", reason, detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
+				strategy.Notifier.Notify(trendIcon+" *TRIGGERED* reason: %s", reason, detector, kline)
 			} else {
-				strategy.Notifier.Notify(trendIcon+" *TRIGGERED* ", detector.SlackAttachment(), slackstyle.SlackAttachmentCreator(kline).SlackAttachment())
+				strategy.Notifier.Notify(trendIcon+" *TRIGGERED* ", detector, kline)
 			}
 
 			var order, err = strategy.NewOrder(klineOrWindow, strategy.TradingContext)
