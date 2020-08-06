@@ -174,9 +174,9 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 						Fields: []slack.AttachmentField{
 							{Short: true, Title: "Current Price", Value: strategy.market.FormatPrice(closedPrice)},
 							{Short: true, Title: "Stop Price", Value: strategy.market.FormatPrice(stopPrice)},
-							{Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopSellRatio, 2)},
-							{Short: true, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
 							{Short: true, Title: "Recent Low", Value: strategy.market.FormatPrice(recentLow)},
+							{Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopSellRatio, 2)},
+							{Short: false, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
 						},
 					}
 					strategy.Notifier.Notify(":raised_hands: %s stop sell", kline.Symbol, attachment, recentKLines)
@@ -191,9 +191,9 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 						Fields: []slack.AttachmentField{
 							{Short: true, Title: "Current Price", Value: strategy.market.FormatPrice(closedPrice)},
 							{Short: true, Title: "Stop Price", Value: strategy.market.FormatPrice(stopPrice)},
-							{Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopBuyRatio, 2)},
-							{Short: true, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
 							{Short: true, Title: "Recent High", Value: strategy.market.FormatPrice(recentHigh)},
+							{Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopBuyRatio, 2)},
+							{Short: false, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
 						},
 					}
 					strategy.Notifier.Notify(":raised_hands: %s stop buy", kline.Symbol, attachment, recentKLines)
