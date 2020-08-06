@@ -261,7 +261,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			// 4 -> 0.0001 -> 0.001
 			tick10 := math.Pow10(-strategy.market.PricePrecision + 1)
 			minProfitSpread := math.Max(strategy.MinProfitSpread, tick10)
-			estimatedFee := currentPrice * volume * 0.001
+			estimatedFee := currentPrice * 0.001
 			targetPrice := currentPrice - estimatedFee - minProfitSpread
 
 			stockQuantity := strategy.TradingContext.StockManager.Stocks.QuantityBelowPrice(targetPrice)
