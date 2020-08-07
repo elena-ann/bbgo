@@ -146,11 +146,11 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 			recentKLines := strategy.KLineWindows[kline.Interval]
 			switch kline.Interval {
 			case "1m":
-				recentKLines = recentKLines.Tail(60 * 24) // 24 hours
+				recentKLines = recentKLines.Tail(60 * 8) // 8 hours
 			case "5m":
-				recentKLines = recentKLines.Tail(12 * 5 * 24) // 24 hours
+				recentKLines = recentKLines.Tail(12 * 5 * 8) // 8 hours
 			case "1h":
-				recentKLines = recentKLines.Tail(1 * 24) // 8 hours
+				recentKLines = recentKLines.Tail(1 * 8) // 8 hours
 			case "1d":
 				recentKLines = recentKLines.Tail(1 * 7)
 
