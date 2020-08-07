@@ -298,6 +298,8 @@ func (strategy *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
 		klineWindow.Truncate(strategy.KLineWindowSize)
 	}
 
+	strategy.KLineWindows[kline.Interval] = klineWindow
+
 	strategy.volumeCalculator.HistoricalHigh = math.Max(strategy.volumeCalculator.HistoricalHigh, kline.GetHigh())
 	strategy.volumeCalculator.HistoricalLow = math.Min(strategy.volumeCalculator.HistoricalLow, kline.GetLow())
 	return klineWindow
