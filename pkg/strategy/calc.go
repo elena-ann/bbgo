@@ -28,7 +28,7 @@ func (c *VolumeCalculator) modifyBuyVolume(price float64) float64 {
 func (c *VolumeCalculator) modifySellVolume(price float64) float64 {
 	// \exp\left(\frac{x-10000}{500}\right)
 	maxChange := c.HistoricalHigh - c.HistoricalLow
-	optimismFactor := 0.2 // higher means more optimistic
+	optimismFactor := 0.1 // higher means more optimistic
 	targetPrice := c.HistoricalHigh * (1 + optimismFactor) // target to sell most x1 at 10000.0
 	flatness := maxChange * 0.21                           // higher number sells more in the middle section, lower number sells fewer in the middle section.
 	return math.Min(1.0, math.Exp((price - targetPrice) / flatness))
