@@ -161,7 +161,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 
 			recentHigh := recentKLines.GetHigh()
 			recentLow := recentKLines.GetLow()
-			recentChange := recentHigh - recentLow
+			recentChange := math.Abs(recentHigh - recentLow)
 			closedPrice := kline.GetClose()
 
 			switch order.Side {
