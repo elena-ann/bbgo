@@ -252,13 +252,13 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	case types.SideTypeSell:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.BaseCurrency]; ok {
-			available := balance.Available
+			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinNotional * 1.1)
 
-			if available < strategy.market.MinQuantity {
+			available := balance.Available
+			quantity = math.Min(quantity, available)
+			if quantity < strategy.market.MinQuantity {
 				return nil, fmt.Errorf("insufficient base balance: %f > minimal quantity %f", available, strategy.market.MinQuantity)
 			}
-
-			quantity = math.Min(quantity, available)
 
 			// price tick10
 			// 2 -> 0.01 -> 0.1
@@ -278,7 +278,6 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 				return nil, fmt.Errorf("quantity %f less than min lot %f", quantity, tradingCtx.Market.MinLot)
 			}
 
-			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinNotional * 1.1)
 
 			notional := quantity * currentPrice
 			if notional < tradingCtx.Market.MinNotional {
