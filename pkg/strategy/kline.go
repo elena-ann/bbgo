@@ -260,6 +260,12 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 				return nil, fmt.Errorf("insufficient base balance: %f > minimal quantity %f", available, strategy.market.MinQuantity)
 			}
 
+			notional := quantity * currentPrice
+			if notional < tradingCtx.Market.MinNotional {
+				return nil, fmt.Errorf("notional %f < min notional: %f", notional , tradingCtx.Market.MinNotional)
+			}
+
+
 			// price tick10
 			// 2 -> 0.01 -> 0.1
 			// 4 -> 0.0001 -> 0.001
@@ -279,7 +285,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			}
 
 
-			notional := quantity * currentPrice
+			notional = quantity * currentPrice
 			if notional < tradingCtx.Market.MinNotional {
 				return nil, fmt.Errorf("notional %f < min notional: %f", notional , tradingCtx.Market.MinNotional)
 			}
