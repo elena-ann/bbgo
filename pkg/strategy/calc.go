@@ -21,7 +21,7 @@ func (c *VolumeCalculator) modifyBuyVolume(price float64) float64 {
 	maxChange := c.HistoricalHigh - c.HistoricalLow
 	pessimisticFactor := 0.1
 	targetPrice := c.HistoricalLow * (1 - pessimisticFactor) // we will get 1 at price 7500, and more below 7500
-	flatness := maxChange * 0.36                             // higher number buys more in the middle section. higher number gets more flat line, reduced to 0 at price 2000 * 10
+	flatness := maxChange * 0.3                             // higher number buys more in the middle section. higher number gets more flat line, reduced to 0 at price 2000 * 10
 	return math.Min(1.0, math.Exp(-(price - targetPrice) / flatness))
 }
 
