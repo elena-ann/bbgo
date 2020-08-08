@@ -22,6 +22,9 @@ type KLineStrategy struct {
 	BaseQuantity    float64         `json:"baseQuantity"`
 	KLineWindowSize int             `json:"kLineWindowSize"`
 
+	MinQuoteBalance float64 `json:"minQuoteBalance"`
+	MaxBaseBalance float64 `json:"maxBaseBalance"`
+
 	MinProfitSpread float64 `json:"minProfitSpread"`
 	StopBuyRatio    float64 `json:"stopBuyRatio"`
 	StopSellRatio   float64 `json:"stopSellRatio"`
@@ -231,8 +234,10 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	case types.SideTypeBuy:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.QuoteCurrency]; ok {
-			if balance.Available < 2000.0 {
-				return nil, fmt.Errorf("quote balance level is too low: %s", bbgo.USD.FormatMoneyFloat64(balance.Available))
+			if balance.Available < strategy.MinQuoteBalance {
+				return nil, fmt.Errorf("quote balance level is too low: %s < %s",
+					bbgo.USD.FormatMoneyFloat64(balance.Available),
+					bbgo.USD.FormatMoneyFloat64(strategy.MinQuoteBalance))
 			}
 
 			available := math.Max(0.0, balance.Available - 2000.0)
@@ -252,6 +257,11 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	case types.SideTypeSell:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.BaseCurrency]; ok {
+			if balance.Available > strategy.MaxBaseBalance {
+				return nil, fmt.Errorf("base balance level is too high: %f > %f", balance.Available, strategy.MaxBaseBalance)
+			}
+
+
 			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinNotional * 1.1)
 
 			available := balance.Available
