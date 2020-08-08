@@ -23,7 +23,7 @@ type KLineStrategy struct {
 	KLineWindowSize int             `json:"kLineWindowSize"`
 
 	MinQuoteBalance float64 `json:"minQuoteBalance"`
-	MaxBaseBalance float64 `json:"maxBaseBalance"`
+	MaxAssetBalance float64 `json:"maxAssetBalance"`
 
 	MinProfitSpread float64 `json:"minProfitSpread"`
 	StopBuyRatio    float64 `json:"stopBuyRatio"`
@@ -257,8 +257,8 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	case types.SideTypeSell:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.BaseCurrency]; ok {
-			if balance.Available > strategy.MaxBaseBalance {
-				return nil, fmt.Errorf("base balance level is too high: %f > %f", balance.Available, strategy.MaxBaseBalance)
+			if balance.Available > strategy.MaxAssetBalance {
+				return nil, fmt.Errorf("base balance level is too high: %f > %f", balance.Available, strategy.MaxAssetBalance)
 			}
 
 
