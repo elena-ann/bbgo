@@ -240,7 +240,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 					bbgo.USD.FormatMoneyFloat64(strategy.MinQuoteBalance))
 			}
 
-			available := math.Max(0.0, balance.Available - 2000.0)
+			available := math.Max(0.0, balance.Available - strategy.MinQuoteBalance)
 
 			if available < strategy.market.MinAmount {
 				return nil, fmt.Errorf("insufficient quote balance: %f < min amount %f", available, strategy.market.MinAmount)
