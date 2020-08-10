@@ -170,7 +170,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 			switch order.Side {
 
 			case types.SideTypeSell:
-				stopPrice := recentLow + strategy.StopSellRatio*recentChange
+				stopPrice := recentLow + strategy.StopSellRatio*recentChange + strategy.MinProfitSpread
 				if closedPrice < stopPrice {
 					attachment := slack.Attachment{
 						Title: "Stop Sell Condition",
@@ -187,7 +187,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				}
 
 			case types.SideTypeBuy:
-				stopPrice := recentHigh - strategy.StopBuyRatio*recentChange
+				stopPrice := recentHigh - strategy.StopBuyRatio*recentChange - strategy.MinProfitSpread
 				if closedPrice > stopPrice {
 					attachment := slack.Attachment{
 						Title: "Stop Buy Condition",
