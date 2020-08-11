@@ -24,6 +24,7 @@ type KLineStrategy struct {
 
 	MinQuoteBalance float64 `json:"minQuoteBalance"`
 	MaxAssetBalance float64 `json:"maxAssetBalance"`
+	MinAssetBalance float64 `json:"minAssetBalance"`
 
 	MinProfitSpread float64 `json:"minProfitSpread"`
 	StopBuyRatio    float64 `json:"stopBuyRatio"`
@@ -248,13 +249,13 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 				}
 			}
 
-			available := math.Max(0.0, balance.Available - strategy.MinQuoteBalance)
+			available := math.Max(0.0, balance.Available-strategy.MinQuoteBalance)
 
 			if available < strategy.market.MinAmount {
 				return nil, fmt.Errorf("insufficient quote balance: %f < min amount %f", available, strategy.market.MinAmount)
 			}
 
-			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinAmount * 1.1)
+			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinAmount*1.1)
 			quantity = adjustQuantityByMaxAmount(quantity, currentPrice, available)
 			amount := quantity * currentPrice
 			if amount < strategy.market.MinAmount {
@@ -265,8 +266,11 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	case types.SideTypeSell:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.BaseCurrency]; ok {
+			if util.NotZero(strategy.MinAssetBalance) && balance.Available < strategy.MinAssetBalance {
+				return nil, fmt.Errorf("base balance level is too low: %f > %f", balance.Available, strategy.MinAssetBalance)
+			}
 
-			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinNotional * 1.1)
+			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinNotional*1.1)
 
 			available := balance.Available
 			quantity = math.Min(quantity, available)
@@ -276,9 +280,8 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 
 			notional := quantity * currentPrice
 			if notional < tradingCtx.Market.MinNotional {
-				return nil, fmt.Errorf("notional %f < min notional: %f", notional , tradingCtx.Market.MinNotional)
+				return nil, fmt.Errorf("notional %f < min notional: %f", notional, tradingCtx.Market.MinNotional)
 			}
-
 
 			// price tick10
 			// 2 -> 0.01 -> 0.1
@@ -298,10 +301,9 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 				return nil, fmt.Errorf("quantity %f less than min lot %f", quantity, tradingCtx.Market.MinLot)
 			}
 
-
 			notional = quantity * currentPrice
 			if notional < tradingCtx.Market.MinNotional {
-				return nil, fmt.Errorf("notional %f < min notional: %f", notional , tradingCtx.Market.MinNotional)
+				return nil, fmt.Errorf("notional %f < min notional: %f", notional, tradingCtx.Market.MinNotional)
 			}
 
 		}
