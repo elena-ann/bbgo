@@ -243,7 +243,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			}
 
 			if baseBalance, ok := tradingCtx.Balances[strategy.market.BaseCurrency]; ok {
-				if baseBalance.Available > strategy.MaxAssetBalance {
+				if util.NotZero(strategy.MaxAssetBalance) && baseBalance.Available > strategy.MaxAssetBalance {
 					return nil, fmt.Errorf("base balance level is too high: %f > %f", baseBalance.Available, strategy.MaxAssetBalance)
 				}
 			}
