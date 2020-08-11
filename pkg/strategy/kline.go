@@ -242,6 +242,12 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 					bbgo.USD.FormatMoneyFloat64(strategy.MinQuoteBalance))
 			}
 
+			if baseBalance, ok := tradingCtx.Balances[strategy.market.BaseCurrency]; ok {
+				if baseBalance.Available > strategy.MaxAssetBalance {
+					return nil, fmt.Errorf("base balance level is too high: %f > %f", baseBalance.Available, strategy.MaxAssetBalance)
+				}
+			}
+
 			available := math.Max(0.0, balance.Available - strategy.MinQuoteBalance)
 
 			if available < strategy.market.MinAmount {
@@ -259,10 +265,6 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	case types.SideTypeSell:
 
 		if balance, ok := tradingCtx.Balances[strategy.market.BaseCurrency]; ok {
-			if balance.Available > strategy.MaxAssetBalance {
-				return nil, fmt.Errorf("base balance level is too high: %f > %f", balance.Available, strategy.MaxAssetBalance)
-			}
-
 
 			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinNotional * 1.1)
 
