@@ -123,7 +123,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 		if !ok {
 
 			if len(reason) > 0 &&
-				(strategy.cache.IsTextFresh(reason, 30*time.Minute) &&
+				(strategy.cache.IsTextFresh(reason, 30*time.Minute) ||
 					strategy.cache.IsObjectFresh(&detector, 10*time.Minute)) {
 
 				strategy.Notifier.Notify(trendIcon+" *SKIP* reason: %s", reason, &detector, kline)
