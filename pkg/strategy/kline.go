@@ -182,7 +182,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 							{Short: false, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
 						},
 					}
-					strategy.Notifier.Notify(":raised_hands: %s stop sell at %f", kline.Symbol, stopPrice, attachment, recentKLines)
+					strategy.Notifier.Notify(":raised_hands: %s stop sell at %f", kline.Symbol, stopPrice, attachment)
 					return
 				}
 
@@ -200,7 +200,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 							{Short: false, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
 						},
 					}
-					strategy.Notifier.Notify(":raised_hands: %s stop buy at %f", kline.Symbol, stopPrice, attachment, recentKLines)
+					strategy.Notifier.Notify(":raised_hands: %s stop buy at %f", kline.Symbol, stopPrice, attachment)
 					return
 				}
 
