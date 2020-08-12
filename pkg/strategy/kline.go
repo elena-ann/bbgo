@@ -56,10 +56,10 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 
 	strategy.market = market
 
+	lastKline := strategy.KLineWindows["1m"].Tail(1)
 	days := 7
-	klineWindow := strategy.KLineWindows["1d"].Tail(7)
-	high := klineWindow.GetHigh()
-	low := klineWindow.GetLow()
+	high := strategy.GetHistoricalHigh(days)
+	low := strategy.GetHistoricalLow(days)
 
 	strategy.Notifier.Notify("Here is the historical price for strategy: high / low %f / %f", high, low, slack.Attachment{
 		Title:   fmt.Sprintf("%s Historical Price %d days high and low", strategy.Symbol, days),
@@ -68,7 +68,7 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 		Fields: []slack.AttachmentField{
 			{Title: "High", Value: market.FormatPrice(high), Short: true},
 			{Title: "Low", Value: market.FormatPrice(low), Short: true},
-			{Title: "Current", Value: market.FormatPrice(klineWindow.GetClose()), Short: true},
+			{Title: "Current", Value: market.FormatPrice(lastKline.GetClose()), Short: true},
 		},
 	})
 
@@ -80,6 +80,19 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 	}
 
 	return nil
+}
+
+
+func (strategy *KLineStrategy) GetHistoricalLow(days int) float64 {
+	kline5m := strategy.KLineWindows["5m"].Tail(12 * 24)
+	kline7days := strategy.KLineWindows["1d"].Tail(days)
+	return math.Min(kline7days.GetLow(), kline5m.GetLow())
+}
+
+func (strategy *KLineStrategy) GetHistoricalHigh(days int) float64 {
+	kline5m := strategy.KLineWindows["5m"].Tail(12 * 24)
+	kline7days := strategy.KLineWindows["1d"].Tail(days)
+	return math.Max(kline7days.GetHigh(), kline5m.GetHigh())
 }
 
 func (strategy *KLineStrategy) OnNewStream(stream *types.StandardPrivateStream) error {
@@ -147,24 +160,9 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				return
 			}
 
-			recentKLines := strategy.KLineWindows[kline.Interval]
-			switch kline.Interval {
-			case "1m":
-				recentKLines = recentKLines.Tail(60 * 24 * 2)
-			case "5m":
-				recentKLines = recentKLines.Tail(12 * 5 * 24 * 2)
-			case "1h":
-				recentKLines = recentKLines.Tail(1 * 24 * 2)
-			case "1d":
-				recentKLines = recentKLines.Tail(1 * 7)
-
-			default:
-				recentKLines = recentKLines.Tail(3)
-
-			}
-
-			recentHigh := recentKLines.GetHigh()
-			recentLow := recentKLines.GetLow()
+			days := 3
+			recentHigh := strategy.GetHistoricalHigh(days)
+			recentLow := strategy.GetHistoricalLow(days)
 			recentChange := math.Abs(recentHigh - recentLow)
 			closedPrice := kline.GetClose()
 
