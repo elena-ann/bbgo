@@ -6,8 +6,9 @@ import (
 )
 
 // https://www.desmos.com/calculator/wik4ozkwto
-type VolumeCalculator struct {
+type QuantityCalculator struct {
 	Market types.Market
+	MaxKLines map[string]types.KLine
 
 	BaseQuantity float64
 	HistoricalHigh float64 // 10500.0
@@ -17,7 +18,7 @@ type VolumeCalculator struct {
 	OptimismFactor    float64
 }
 
-func (c *VolumeCalculator) modifyBuyVolume(price float64) float64 {
+func (c *QuantityCalculator) modifyBuyVolume(price float64) float64 {
 	maxChange := c.HistoricalHigh - c.HistoricalLow
 	pessimisticFactor := 0.1
 	targetPrice := c.HistoricalLow * (1 - pessimisticFactor) // we will get 1 at price 7500, and more below 7500
@@ -25,7 +26,7 @@ func (c *VolumeCalculator) modifyBuyVolume(price float64) float64 {
 	return math.Min(1.0, math.Exp(-(price - targetPrice) / flatness))
 }
 
-func (c *VolumeCalculator) modifySellVolume(price float64) float64 {
+func (c *QuantityCalculator) modifySellVolume(price float64) float64 {
 	// \exp\left(\frac{x-10000}{500}\right)
 	maxChange := c.HistoricalHigh - c.HistoricalLow
 	optimismFactor := 0.1 // higher means more optimistic
@@ -34,7 +35,7 @@ func (c *VolumeCalculator) modifySellVolume(price float64) float64 {
 	return math.Min(1.0, math.Exp((price - targetPrice) / flatness))
 }
 
-func (c *VolumeCalculator) VolumeByChange(change float64) float64 {
+func (c *QuantityCalculator) VolumeByChange(change float64) float64 {
 	maxChange := c.HistoricalHigh - c.HistoricalLow
 	flatness := maxChange * 0.22
 
@@ -42,7 +43,7 @@ func (c *VolumeCalculator) VolumeByChange(change float64) float64 {
 	return math.Min(2.0, math.Exp((math.Abs(change))/flatness))
 }
 
-func (c *VolumeCalculator) minQuantity(volume float64) float64 {
+func (c *QuantityCalculator) minQuantity(volume float64) float64 {
 	return math.Max(c.Market.MinQuantity, volume)
 }
 
@@ -68,7 +69,7 @@ func adjustQuantityByMinAmount(quantity float64, currentPrice float64, minAmount
 	return quantity
 }
 
-func (c *VolumeCalculator) Volume(currentPrice float64, change float64, side types.SideType) float64 {
+func (c *QuantityCalculator) Volume(currentPrice float64, change float64, side types.SideType) float64 {
 	volume := c.BaseQuantity * c.VolumeByChange(change)
 
 	if side == types.SideTypeSell {

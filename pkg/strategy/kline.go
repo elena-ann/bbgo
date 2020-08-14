@@ -37,9 +37,10 @@ type KLineStrategy struct {
 	Notifier bbgo.Notifier `json:"-"`
 
 	market           types.Market                 `json:"-"`
+	maxKLines        map[string]types.KLine       `json:"-"`
 	KLineWindows     map[string]types.KLineWindow `json:"-"`
 	cache            *util.VolatileMemory         `json:"-"`
-	volumeCalculator *VolumeCalculator            `json:"-"`
+	volumeCalculator *QuantityCalculator          `json:"-"`
 
 	detectCallbacks []func(ok bool, reason string, detector *KLineDetector, kline types.KLineOrWindow)
 }
@@ -56,10 +57,10 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 
 	strategy.market = market
 
-	lastKline := strategy.KLineWindows["1m"].Tail(1)
 	days := 7
 	high := strategy.GetHistoricalHigh(days)
 	low := strategy.GetHistoricalLow(days)
+	maxKLines := strategy.loadMaxKLines()
 
 	strategy.Notifier.Notify(":chart: Historical price: high / low %f / %f", high, low, slack.Attachment{
 		Title:   fmt.Sprintf("%s Historical Price %d days high and low", strategy.Symbol, days),
@@ -68,12 +69,12 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 		Fields: []slack.AttachmentField{
 			{Title: "High", Value: market.FormatPrice(high), Short: true},
 			{Title: "Low", Value: market.FormatPrice(low), Short: true},
-			{Title: "Current", Value: market.FormatPrice(lastKline.GetClose()), Short: true},
 		},
 	})
 
-	strategy.volumeCalculator = &VolumeCalculator{
+	strategy.volumeCalculator = &QuantityCalculator{
 		Market:         market,
+		MaxKLines:      maxKLines,
 		BaseQuantity:   strategy.BaseQuantity,
 		HistoricalHigh: high,
 		HistoricalLow:  low,
@@ -82,6 +83,26 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 	return nil
 }
 
+func (strategy *KLineStrategy) loadMaxKLines() map[string]types.KLine {
+	maxKLines := make(map[string]types.KLine)
+
+	for interval, klines := range strategy.KLineWindows {
+		var maxChange = 0.0
+		var maxKLine *types.KLine = nil
+		for _, kline := range klines {
+			c := klines.GetMaxChange()
+			if c > maxChange {
+				maxChange = c
+				maxKLine = &kline
+			}
+		}
+		if maxKLine != nil {
+			maxKLines[interval] = *maxKLine
+		}
+	}
+
+	return maxKLines
+}
 
 func (strategy *KLineStrategy) GetHistoricalLow(days int) float64 {
 	kline5m := strategy.KLineWindows["5m"].Tail(12 * 24)
