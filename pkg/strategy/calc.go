@@ -8,7 +8,6 @@ import (
 // https://www.desmos.com/calculator/wik4ozkwto
 type QuantityCalculator struct {
 	Market types.Market
-	MaxKLines map[string]types.KLine
 
 	BaseQuantity float64
 	HistoricalHigh float64 // 10500.0
@@ -69,7 +68,7 @@ func adjustQuantityByMinAmount(quantity float64, currentPrice float64, minAmount
 	return quantity
 }
 
-func (c *QuantityCalculator) Volume(currentPrice float64, change float64, side types.SideType) float64 {
+func (c *QuantityCalculator) Quantity(side types.SideType, currentPrice float64, change,  maxChange float64) float64 {
 	volume := c.BaseQuantity * c.VolumeByChange(change)
 
 	if side == types.SideTypeSell {

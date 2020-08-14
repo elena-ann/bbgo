@@ -36,11 +36,11 @@ type KLineStrategy struct {
 
 	Notifier bbgo.Notifier `json:"-"`
 
-	market           types.Market                 `json:"-"`
-	maxKLines        map[string]types.KLine       `json:"-"`
-	KLineWindows     map[string]types.KLineWindow `json:"-"`
-	cache            *util.VolatileMemory         `json:"-"`
-	volumeCalculator *QuantityCalculator          `json:"-"`
+	market             types.Market                 `json:"-"`
+	maxKLines          map[string]types.KLine       `json:"-"`
+	KLineWindows       map[string]types.KLineWindow `json:"-"`
+	cache              *util.VolatileMemory         `json:"-"`
+	quantityCalculator *QuantityCalculator          `json:"-"`
 
 	detectCallbacks []func(ok bool, reason string, detector *KLineDetector, kline types.KLineOrWindow)
 }
@@ -60,21 +60,29 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 	days := 7
 	high := strategy.GetHistoricalHigh(days)
 	low := strategy.GetHistoricalLow(days)
-	maxKLines := strategy.loadMaxKLines()
+	strategy.maxKLines = FindMaxKLines(strategy.KLineWindows)
 
-	strategy.Notifier.Notify(":chart: Historical price: high / low %f / %f", high, low, slack.Attachment{
-		Title:   fmt.Sprintf("%s Historical Price %d days high and low", strategy.Symbol, days),
-		Pretext: "",
-		Text:    "",
-		Fields: []slack.AttachmentField{
-			{Title: "High", Value: market.FormatPrice(high), Short: true},
-			{Title: "Low", Value: market.FormatPrice(low), Short: true},
+	var args = []interface{}{
+		high, low,
+		slack.Attachment{
+			Title:   fmt.Sprintf("%s Historical Price %d days high and low", strategy.Symbol, days),
+			Pretext: "",
+			Text:    "",
+			Fields: []slack.AttachmentField{
+				{Title: "High", Value: market.FormatPrice(high), Short: true},
+				{Title: "Low", Value: market.FormatPrice(low), Short: true},
+			},
 		},
-	})
+	}
 
-	strategy.volumeCalculator = &QuantityCalculator{
+	for _, kline := range strategy.maxKLines {
+		args = append(args, kline)
+	}
+
+	strategy.Notifier.Notify(":chart: Historical price: high / low %f / %f", args...)
+
+	strategy.quantityCalculator = &QuantityCalculator{
 		Market:         market,
-		MaxKLines:      maxKLines,
 		BaseQuantity:   strategy.BaseQuantity,
 		HistoricalHigh: high,
 		HistoricalLow:  low,
@@ -83,22 +91,20 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 	return nil
 }
 
-func (strategy *KLineStrategy) loadMaxKLines() map[string]types.KLine {
+func FindMaxKLines(klineWindows map[string]types.KLineWindow) map[string]types.KLine {
 	maxKLines := make(map[string]types.KLine)
-
-	for interval, klines := range strategy.KLineWindows {
+	for interval, klines := range klineWindows {
 		var maxChange = 0.0
-		var maxKLine *types.KLine = nil
+		var maxKLine = klines[0]
 		for _, kline := range klines {
-			c := klines.GetMaxChange()
+			c := math.Abs(kline.GetMaxChange())
 			if c > maxChange {
 				maxChange = c
-				maxKLine = &kline
+				maxKLine = kline
 			}
 		}
-		if maxKLine != nil {
-			maxKLines[interval] = *maxKLine
-		}
+
+		maxKLines[interval] = maxKLine
 	}
 
 	return maxKLines
@@ -247,7 +253,8 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 	}
 
 	var currentPrice = kline.GetClose()
-	var quantity = strategy.volumeCalculator.Volume(currentPrice, kline.GetChange(), side)
+	var maxKLine = strategy.maxKLines[kline.GetInterval()]
+	var quantity = strategy.quantityCalculator.Quantity(side, currentPrice, kline.GetChange(), maxKLine.GetMaxChange())
 
 	tradingCtx.Lock()
 	defer tradingCtx.Unlock()
@@ -346,8 +353,8 @@ func (strategy *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
 
 	strategy.KLineWindows[kline.Interval] = klineWindow
 
-	strategy.volumeCalculator.HistoricalHigh = math.Max(strategy.volumeCalculator.HistoricalHigh, kline.GetHigh())
-	strategy.volumeCalculator.HistoricalLow = math.Min(strategy.volumeCalculator.HistoricalLow, kline.GetLow())
+	strategy.quantityCalculator.HistoricalHigh = math.Max(strategy.quantityCalculator.HistoricalHigh, kline.GetHigh())
+	strategy.quantityCalculator.HistoricalLow = math.Min(strategy.quantityCalculator.HistoricalLow, kline.GetLow())
 	return klineWindow
 }
 
