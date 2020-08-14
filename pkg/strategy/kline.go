@@ -351,6 +351,11 @@ func (strategy *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
 		klineWindow.Truncate(strategy.KLineWindowSize)
 	}
 
+	// update max change kline
+	if kline.GetMaxChange() > strategy.maxKLines[kline.Interval].GetMaxChange() {
+		strategy.maxKLines[kline.Interval] = kline
+	}
+
 	strategy.KLineWindows[kline.Interval] = klineWindow
 
 	strategy.quantityCalculator.HistoricalHigh = math.Max(strategy.quantityCalculator.HistoricalHigh, kline.GetHigh())
