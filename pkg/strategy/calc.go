@@ -34,12 +34,10 @@ func (c *QuantityCalculator) modifySellVolume(price float64) float64 {
 	return math.Min(1.0, math.Exp((price - targetPrice) / flatness))
 }
 
-func (c *QuantityCalculator) VolumeByChange(change float64) float64 {
-	maxChange := c.HistoricalHigh - c.HistoricalLow
+func (c *QuantityCalculator) QuantityByChange(change float64, maxChange float64) float64 {
 	flatness := maxChange * 0.22
 
-	// double
-	return math.Min(2.0, math.Exp((math.Abs(change))/flatness))
+	return math.Min(1.0, math.Exp((math.Abs(change))/flatness))
 }
 
 func (c *QuantityCalculator) minQuantity(volume float64) float64 {
@@ -69,7 +67,7 @@ func adjustQuantityByMinAmount(quantity float64, currentPrice float64, minAmount
 }
 
 func (c *QuantityCalculator) Quantity(side types.SideType, currentPrice float64, change,  maxChange float64) float64 {
-	volume := c.BaseQuantity * c.VolumeByChange(change)
+	volume := c.BaseQuantity * c.QuantityByChange(change, maxChange)
 
 	if side == types.SideTypeSell {
 		volume *= c.modifySellVolume(currentPrice)
