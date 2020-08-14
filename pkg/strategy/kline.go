@@ -62,24 +62,30 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 	low := strategy.GetHistoricalLow(days)
 	strategy.maxKLines = FindMaxKLines(strategy.KLineWindows)
 
-	var args = []interface{}{
-		high, low,
+	maxChange := math.Abs(high - low)
+	stopBuyPrice := high - strategy.StopBuyRatio*maxChange - strategy.MinProfitSpread
+	stopSellPrice := low + strategy.StopSellRatio*maxChange + strategy.MinProfitSpread
+
+	fields := []slack.AttachmentField{
+		{Title: "High", Value: market.FormatPrice(high), Short: true},
+		{Title: "Low", Value: market.FormatPrice(low), Short: true},
+		{Title: "Stop Buy", Value: market.FormatPrice(stopBuyPrice), Short: true},
+		{Title: "Stop Sell", Value: market.FormatPrice(stopSellPrice), Short: true},
+	}
+	for interval, kline := range strategy.maxKLines {
+		fields = append(fields, slack.AttachmentField{
+			Title: fmt.Sprintf("KLine %s Max Change", interval),
+			Value: market.FormatPrice(kline.GetMaxChange()),
+		})
+	}
+
+	strategy.Notifier.Notify(":chart: Historical price: high / low %f / %f", high, low,
 		slack.Attachment{
-			Title:   fmt.Sprintf("%s Historical Price %d days high and low", strategy.Symbol, days),
+			Title:   fmt.Sprintf("%s %d days", strategy.Symbol, days),
 			Pretext: "",
 			Text:    "",
-			Fields: []slack.AttachmentField{
-				{Title: "High", Value: market.FormatPrice(high), Short: true},
-				{Title: "Low", Value: market.FormatPrice(low), Short: true},
-			},
-		},
-	}
-
-	for _, kline := range strategy.maxKLines {
-		args = append(args, kline)
-	}
-
-	strategy.Notifier.Notify(":chart: Historical price: high / low %f / %f", args...)
+			Fields:  fields,
+		})
 
 	strategy.quantityCalculator = &QuantityCalculator{
 		Market:         market,
@@ -187,9 +193,8 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				return
 			}
 
-			days := 3
-			recentHigh := strategy.GetHistoricalHigh(days)
-			recentLow := strategy.GetHistoricalLow(days)
+			recentHigh := strategy.GetHistoricalHigh(strategy.KLineWindowSize)
+			recentLow := strategy.GetHistoricalLow(strategy.KLineWindowSize)
 			recentChange := math.Abs(recentHigh - recentLow)
 			closedPrice := kline.GetClose()
 
