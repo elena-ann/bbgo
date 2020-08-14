@@ -57,7 +57,7 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 
 	strategy.market = market
 
-	days := 7
+	days := strategy.KLineWindowSize
 	high := strategy.GetHistoricalHigh(days)
 	low := strategy.GetHistoricalLow(days)
 	strategy.maxKLines = FindMaxKLines(strategy.KLineWindows)
