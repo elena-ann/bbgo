@@ -242,7 +242,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 	}
 }
 
-func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *bbgo.TradingContext) (*types.Order, error) {
+func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *bbgo.TradingContext) (*types.SubmitOrder, error) {
 	var trend = kline.GetTrend()
 
 	var side types.SideType
@@ -314,7 +314,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 			// 4 -> 0.0001 -> 0.001
 			tick10 := math.Pow10(-strategy.market.PricePrecision + 1)
 			minProfitSpread := math.Max(strategy.MinProfitSpread, tick10)
-			estimatedFee := currentPrice * 0.001 * 2
+			estimatedFee := currentPrice * 0.0015 * 2 // double the fee
 			targetPrice := currentPrice - estimatedFee - minProfitSpread
 
 			stockQuantity := strategy.TradingContext.StockManager.Stocks.QuantityBelowPrice(targetPrice)
@@ -335,11 +335,11 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 		}
 	}
 
-	return &types.Order{
-		Symbol:    strategy.Symbol,
-		Type:      types.OrderTypeMarket,
-		Side:      side,
-		VolumeStr: tradingCtx.Market.FormatVolume(quantity),
+	return &types.SubmitOrder{
+		Symbol:   strategy.Symbol,
+		Type:     types.OrderTypeMarket,
+		Side:     side,
+		Quantity: tradingCtx.Market.FormatVolume(quantity),
 	}, nil
 }
 
