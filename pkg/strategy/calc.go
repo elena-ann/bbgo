@@ -1,15 +1,16 @@
 package strategy
 
 import (
-	"github.com/c9s/bbgo/pkg/bbgo/types"
 	"math"
+
+	"github.com/c9s/bbgo/pkg/bbgo/types"
 )
 
 // https://www.desmos.com/calculator/wik4ozkwto
 type QuantityCalculator struct {
 	Market types.Market
 
-	BaseQuantity float64
+	BaseQuantity   float64
 	HistoricalHigh float64 // 10500.0
 	HistoricalLow  float64 // 7500.0
 
@@ -19,25 +20,27 @@ type QuantityCalculator struct {
 
 func (c *QuantityCalculator) modifyBuyVolume(price float64) float64 {
 	maxChange := c.HistoricalHigh - c.HistoricalLow
-	pessimisticFactor := 0.1
+	pessimisticFactor := 0.01
 	targetPrice := c.HistoricalLow * (1 - pessimisticFactor) // we will get 1 at price 7500, and more below 7500
-	flatness := maxChange * 0.3                             // higher number buys more in the middle section. higher number gets more flat line, reduced to 0 at price 2000 * 10
-	return math.Min(1.0, math.Exp(-(price - targetPrice) / flatness))
+	//flatness := maxChange * 0.3                              // higher number buys more in the middle section. higher number gets more flat line, reduced to 0 at price 2000 * 10
+	flatness := maxChange                             // higher number buys more in the middle section. higher number gets more flat line, reduced to 0 at price 2000 * 10
+	return math.Min(3.0, math.Exp(-(price-targetPrice)/flatness))
 }
 
 func (c *QuantityCalculator) modifySellVolume(price float64) float64 {
 	// \exp\left(\frac{x-10000}{500}\right)
 	maxChange := c.HistoricalHigh - c.HistoricalLow
-	optimismFactor := 0.1 // higher means more optimistic
+	optimismFactor := 0.1                                  // higher means more optimistic
 	targetPrice := c.HistoricalHigh * (1 + optimismFactor) // target to sell most x1 at 10000.0
-	flatness := maxChange * 0.21                           // higher number sells more in the middle section, lower number sells fewer in the middle section.
-	return math.Min(1.0, math.Exp((price - targetPrice) / flatness))
+	//flatness := maxChange * 0.21                           // higher number sells more in the middle section, lower number sells fewer in the middle section.
+	flatness := maxChange                           // higher number sells more in the middle section, lower number sells fewer in the middle section.
+	return math.Min(3.0, math.Exp((price-targetPrice)/flatness))
 }
 
 func (c *QuantityCalculator) QuantityByChange(change float64, maxChange float64) float64 {
 	flatness := maxChange * 0.22
-
-	return math.Min(1.0, math.Exp((math.Abs(change))/flatness))
+	// flatness := maxChange
+	return math.Min(3.0, math.Exp((math.Abs(change))/flatness))
 }
 
 func (c *QuantityCalculator) minQuantity(volume float64) float64 {
@@ -54,7 +57,6 @@ func adjustQuantityByMaxAmount(quantity float64, currentPrice float64, maxAmount
 	return quantity
 }
 
-
 func adjustQuantityByMinAmount(quantity float64, currentPrice float64, minAmount float64) float64 {
 	// modify quantity for the min amount
 	amount := currentPrice * quantity
@@ -66,13 +68,13 @@ func adjustQuantityByMinAmount(quantity float64, currentPrice float64, minAmount
 	return quantity
 }
 
-func (c *QuantityCalculator) Quantity(side types.SideType, currentPrice float64, change,  maxChange float64) float64 {
+func (c *QuantityCalculator) Quantity(side types.SideType, currentPrice float64, change, maxChange float64) float64 {
 	volume := c.BaseQuantity * c.QuantityByChange(change, maxChange)
 
 	if side == types.SideTypeSell {
-		volume *= c.modifySellVolume(currentPrice)
+		volume *= 1.0 + c.modifySellVolume(currentPrice)
 	} else {
-		volume *= c.modifyBuyVolume(currentPrice)
+		volume *= 1.0 + c.modifyBuyVolume(currentPrice)
 	}
 
 	volume = c.minQuantity(volume)
