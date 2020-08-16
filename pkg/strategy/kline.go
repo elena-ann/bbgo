@@ -291,7 +291,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 				return nil, fmt.Errorf("insufficient quote balance: %f < min amount %f", available, strategy.market.MinAmount)
 			}
 
-			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinAmount*1.1)
+			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinAmount*1.01)
 			quantity = adjustQuantityByMaxAmount(quantity, currentPrice, available)
 			amount := quantity * currentPrice
 			if amount < strategy.market.MinAmount {
@@ -306,7 +306,7 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 				return nil, fmt.Errorf("base balance level is too low: %f > %f", balance.Available, strategy.MinAssetBalance)
 			}
 
-			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinNotional*1.1)
+			quantity = adjustQuantityByMinAmount(quantity, currentPrice, strategy.market.MinNotional*1.01)
 
 			available := balance.Available
 			quantity = math.Min(quantity, available)
