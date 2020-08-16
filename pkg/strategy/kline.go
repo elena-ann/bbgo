@@ -183,7 +183,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				strategy.Notifier.Notify(trendIcon+" *TRIGGERED* ", &detector, kline)
 			}
 
-			var order, err = strategy.NewOrder(klineOrWindow, strategy.TradingContext)
+			var order, err = strategy.NewOrder(klineOrWindow, strategy.TradingContext, &detector)
 			if err != nil {
 				strategy.Notifier.Notify("%s order error: %v", kline.Symbol, err)
 				return
@@ -247,7 +247,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 	}
 }
 
-func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *bbgo.TradingContext) (*types.SubmitOrder, error) {
+func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *bbgo.TradingContext, detector *KLineDetector) (*types.SubmitOrder, error) {
 	var trend = kline.GetTrend()
 
 	var side types.SideType
@@ -259,7 +259,12 @@ func (strategy *KLineStrategy) NewOrder(kline types.KLineOrWindow, tradingCtx *b
 
 	var currentPrice = kline.GetClose()
 	var maxKLine = strategy.maxKLines[kline.GetInterval()]
-	var quantity = strategy.quantityCalculator.Quantity(side, currentPrice, kline.GetChange(), maxKLine.GetMaxChange())
+	var baseQuantity = strategy.BaseQuantity
+	if detector.BaseQuantity != nil {
+		baseQuantity = *detector.BaseQuantity
+	}
+
+	var quantity = strategy.quantityCalculator.Quantity(baseQuantity, side, currentPrice, kline.GetChange(), maxKLine.GetMaxChange())
 
 	tradingCtx.Lock()
 	defer tradingCtx.Unlock()
@@ -371,6 +376,8 @@ func (strategy *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
 type KLineDetector struct {
 	Name     string `json:"name"`
 	Interval string `json:"interval"`
+
+	BaseQuantity    *float64         `json:"baseQuantity,omitempty"`
 
 	// MinMaxPriceChange is the minimal max price change trigger
 	MinMaxPriceChange float64 `json:"minMaxPriceChange"`

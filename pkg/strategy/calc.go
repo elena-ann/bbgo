@@ -10,7 +10,6 @@ import (
 type QuantityCalculator struct {
 	Market types.Market
 
-	BaseQuantity   float64
 	HistoricalHigh float64 // 10500.0
 	HistoricalLow  float64 // 7500.0
 
@@ -68,8 +67,8 @@ func adjustQuantityByMinAmount(quantity float64, currentPrice float64, minAmount
 	return quantity
 }
 
-func (c *QuantityCalculator) Quantity(side types.SideType, currentPrice float64, change, maxChange float64) float64 {
-	volume := c.BaseQuantity * c.QuantityByChange(change, maxChange)
+func (c *QuantityCalculator) Quantity(baseQuantity float64, side types.SideType, currentPrice float64, change, maxChange float64) float64 {
+	volume := baseQuantity * c.QuantityByChange(change, maxChange)
 
 	if side == types.SideTypeSell {
 		volume *= 1.0 + c.modifySellVolume(currentPrice)
