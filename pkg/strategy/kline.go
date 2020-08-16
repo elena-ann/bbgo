@@ -89,7 +89,6 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 
 	strategy.quantityCalculator = &QuantityCalculator{
 		Market:         market,
-		BaseQuantity:   strategy.BaseQuantity,
 		HistoricalHigh: high,
 		HistoricalLow:  low,
 	}
