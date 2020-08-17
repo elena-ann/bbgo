@@ -17,10 +17,11 @@ import (
 
 //go:generate callbackgen -type KLineStrategy
 type KLineStrategy struct {
-	Symbol          string          `json:"symbol"`
-	Detectors       []KLineDetector `json:"detectors"`
-	BaseQuantity    float64         `json:"baseQuantity"`
-	KLineWindowSize int             `json:"kLineWindowSize"`
+	Symbol         string          `json:"symbol"`
+	Detectors      []KLineDetector `json:"detectors"`
+	BaseQuantity   float64         `json:"baseQuantity"`
+	HistoricalDays int             `json:"historicalDays"`
+	StopWindowSize int             `json:"stopWindowSize"`
 
 	MinQuoteBalance float64 `json:"minQuoteBalance"`
 	MaxAssetBalance float64 `json:"maxAssetBalance"`
@@ -57,7 +58,7 @@ func (strategy *KLineStrategy) Init(tradingContext *bbgo.TradingContext, trader 
 
 	strategy.market = market
 
-	days := strategy.KLineWindowSize
+	days := strategy.StopWindowSize
 	high := strategy.GetHistoricalHigh(days)
 	low := strategy.GetHistoricalLow(days)
 	strategy.maxKLines = FindMaxKLines(strategy.KLineWindows)
@@ -192,20 +193,26 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				return
 			}
 
-			recentHigh := strategy.GetHistoricalHigh(strategy.KLineWindowSize)
-			recentLow := strategy.GetHistoricalLow(strategy.KLineWindowSize)
-			recentChange := math.Abs(recentHigh - recentLow)
-			closedPrice := kline.GetClose()
+			var stopWindowSize = strategy.StopWindowSize
+			if detector.StopWindowSize != nil {
+				stopWindowSize = *detector.StopWindowSize
+			}
+
+			var klineWindow = strategy.KLineWindows[kline.Interval].Tail(stopWindowSize)
+			var recentHigh = klineWindow.GetHigh()
+			var recentLow = klineWindow.GetLow()
+			var recentChange = math.Abs(recentHigh - recentLow)
+			var currentPrice = kline.GetClose()
 
 			switch order.Side {
 
 			case types.SideTypeSell:
 				stopPrice := recentLow + strategy.StopSellRatio*recentChange + strategy.MinProfitSpread
-				if closedPrice < stopPrice {
+				if currentPrice < stopPrice {
 					attachment := slack.Attachment{
 						Title: "Stop Sell Condition",
 						Fields: []slack.AttachmentField{
-							{Short: true, Title: "Current Price", Value: strategy.market.FormatPrice(closedPrice)},
+							{Short: true, Title: "Current Price", Value: strategy.market.FormatPrice(currentPrice)},
 							{Short: true, Title: "Stop Price", Value: strategy.market.FormatPrice(stopPrice)},
 							{Short: true, Title: "Recent Low", Value: strategy.market.FormatPrice(recentLow)},
 							{Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopSellRatio, 2)},
@@ -219,11 +226,11 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 
 			case types.SideTypeBuy:
 				stopPrice := recentHigh - strategy.StopBuyRatio*recentChange - strategy.MinProfitSpread
-				if closedPrice > stopPrice {
+				if currentPrice > stopPrice {
 					attachment := slack.Attachment{
 						Title: "Stop Buy Condition",
 						Fields: []slack.AttachmentField{
-							{Short: true, Title: "Current Price", Value: strategy.market.FormatPrice(closedPrice)},
+							{Short: true, Title: "Current Price", Value: strategy.market.FormatPrice(currentPrice)},
 							{Short: true, Title: "Stop Price", Value: strategy.market.FormatPrice(stopPrice)},
 							{Short: true, Title: "Recent High", Value: strategy.market.FormatPrice(recentHigh)},
 							{Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopBuyRatio, 2)},
@@ -356,8 +363,8 @@ func (strategy *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
 	var klineWindow = strategy.KLineWindows[kline.Interval]
 	klineWindow.Add(kline)
 
-	if strategy.KLineWindowSize > 0 {
-		klineWindow.Truncate(strategy.KLineWindowSize)
+	if strategy.StopWindowSize > 0 {
+		klineWindow.Truncate(strategy.StopWindowSize)
 	}
 
 	// update max change kline
@@ -373,10 +380,11 @@ func (strategy *KLineStrategy) AddKLine(kline types.KLine) types.KLineWindow {
 }
 
 type KLineDetector struct {
-	Name     string `json:"name"`
+	Name     string `json:"name,omitempty"`
 	Interval string `json:"interval"`
 
-	BaseQuantity    *float64         `json:"baseQuantity,omitempty"`
+	BaseQuantity   *float64 `json:"baseQuantity,omitempty"`
+	StopWindowSize *int     `json:"stopWindowSize,omitempty"`
 
 	// MinMaxPriceChange is the minimal max price change trigger
 	MinMaxPriceChange float64 `json:"minMaxPriceChange"`

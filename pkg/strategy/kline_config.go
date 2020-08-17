@@ -1,9 +1,9 @@
 package strategy
 
 var DefaultKLineStrategy = KLineStrategy{
-	Symbol: "BTCUSDT",
-	KLineWindowSize: 500,
-	BaseQuantity: 0.1,
+	Symbol:         "BTCUSDT",
+	StopWindowSize: 500,
+	BaseQuantity:   0.1,
 	Detectors: []KLineDetector{
 		// extremely short term rules
 
