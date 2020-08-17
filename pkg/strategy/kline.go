@@ -198,6 +198,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				stopWindowSize = *detector.StopWindowSize
 			}
 
+			var market = strategy.market
 			if stopWindowSize > 0 {
 				var klineWindow = strategy.KLineWindows[kline.Interval].Tail(stopWindowSize)
 				var recentHigh = klineWindow.GetHigh()
@@ -213,15 +214,15 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 						attachment := slack.Attachment{
 							Title: "Stop Sell Condition",
 							Fields: []slack.AttachmentField{
-								{Short: true, Title: "Current Price", Value: strategy.market.FormatPrice(currentPrice)},
-								{Short: true, Title: "Stop Price", Value: strategy.market.FormatPrice(stopPrice)},
-								{Short: true, Title: "Recent Low", Value: strategy.market.FormatPrice(recentLow)},
+								{Short: true, Title: "Current Price", Value: market.FormatPrice(currentPrice)},
+								{Short: true, Title: "Stop Price", Value: market.FormatPrice(stopPrice)},
+								{Short: true, Title: "Recent Low", Value: market.FormatPrice(recentLow)},
 								{Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopSellRatio, 2)},
-								{Short: false, Title: "Minimal Profit Spread", Value: strategy.market.FormatPrice(strategy.MinProfitSpread)},
+								{Short: false, Title: "Minimal Profit Spread", Value: market.FormatPrice(strategy.MinProfitSpread)},
 								{Short: false, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
 							},
 						}
-						strategy.Notifier.Notify(":raised_hands: %s stop sell at %f", kline.Symbol, stopPrice, attachment)
+						strategy.Notifier.Notify(":raised_hands: %s stop sell at %s (below %s)", kline.Symbol, market.FormatPrice(currentPrice), market.FormatPrice(stopPrice), attachment)
 						return
 					}
 
@@ -231,15 +232,15 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 						attachment := slack.Attachment{
 							Title: "Stop Buy Condition",
 							Fields: []slack.AttachmentField{
-								{Short: true, Title: "Current Price", Value: strategy.market.FormatPrice(currentPrice)},
-								{Short: true, Title: "Stop Price", Value: strategy.market.FormatPrice(stopPrice)},
-								{Short: true, Title: "Recent High", Value: strategy.market.FormatPrice(recentHigh)},
+								{Short: true, Title: "Current Price", Value: market.FormatPrice(currentPrice)},
+								{Short: true, Title: "Stop Price", Value: market.FormatPrice(stopPrice)},
+								{Short: true, Title: "Recent High", Value: market.FormatPrice(recentHigh)},
 								{Short: true, Title: "Ratio", Value: util.FormatFloat(strategy.StopBuyRatio, 2)},
-								{Short: false, Title: "Minimal Profit Spread", Value: strategy.market.FormatPrice(strategy.MinProfitSpread)},
+								{Short: false, Title: "Minimal Profit Spread", Value: market.FormatPrice(strategy.MinProfitSpread)},
 								{Short: false, Title: "Recent Max Price Change", Value: util.FormatFloat(recentChange, 2)},
 							},
 						}
-						strategy.Notifier.Notify(":raised_hands: %s stop buy at %f", kline.Symbol, stopPrice, attachment)
+						strategy.Notifier.Notify(":raised_hands: %s stop buy at %s (above %s)", kline.Symbol, market.FormatPrice(currentPrice), market.FormatPrice(stopPrice), attachment)
 						return
 					}
 
