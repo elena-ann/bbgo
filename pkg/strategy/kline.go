@@ -202,7 +202,7 @@ func (strategy *KLineStrategy) OnKLineClosed(kline *types.KLine) {
 				var klineWindow = strategy.KLineWindows[kline.Interval].Tail(stopWindowSize)
 				var recentHigh = klineWindow.GetHigh()
 				var recentLow = klineWindow.GetLow()
-				var recentChange = math.Abs(recentHigh - recentLow)
+				var recentChange = klineWindow.GetMaxChange()
 				var currentPrice = kline.GetClose()
 
 				switch order.Side {
