@@ -117,13 +117,13 @@ func FindMaxKLines(klineWindows map[string]types.KLineWindow) map[string]types.K
 }
 
 func (strategy *KLineStrategy) GetHistoricalLow(days int) float64 {
-	kline5m := strategy.KLineWindows["5m"].Tail(12 * 24)
+	kline5m := strategy.KLineWindows["5m"].Tail(strategy.StopWindowSize)
 	kline7days := strategy.KLineWindows["1d"].Tail(days)
 	return math.Min(kline7days.GetLow(), kline5m.GetLow())
 }
 
 func (strategy *KLineStrategy) GetHistoricalHigh(days int) float64 {
-	kline5m := strategy.KLineWindows["5m"].Tail(12 * 24)
+	kline5m := strategy.KLineWindows["5m"].Tail(strategy.StopWindowSize)
 	kline7days := strategy.KLineWindows["1d"].Tail(days)
 	return math.Max(kline7days.GetHigh(), kline5m.GetHigh())
 }
